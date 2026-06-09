@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>StockNet - Procurement</title>
+  <style>
+    :root {
+      --bg: #121417; --panel: #1b1e24; --panel-2: #23272f; --surface: #2a2f38;
+      --text: #d8dce3; --text-dim: #828a98; --border: #33393f;
+      --accent: #d4870e; --accent-2: #e69b1e;
+      --ok: #3ba55d; --warn: #e8a418; --danger: #d44040; --info: #4a90c4;
+      --mono: 'JetBrains Mono','Fira Code','SF Mono',Consolas,monospace;
+      --radius: 6px;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body { font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 12px 16px; }
+    label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .6px; }
+    input, select, textarea, button {
+      border-radius: var(--radius); border: 1px solid var(--border);
+      background: var(--surface); color: var(--text); padding: 8px 10px; font-size: 13px; width: 100%;
+    }
+    textarea { resize: vertical; min-height: 60px; }
+    input::placeholder, textarea::placeholder { color: var(--text-dim); opacity: .5; }
+    button { cursor: pointer; background: var(--accent); color: #000; font-weight: 700; border: none; transition: background .15s; }
+    button:hover { background: var(--accent-2); }
+    button.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    button.secondary:hover { border-color: var(--accent); color: var(--accent); }
+    button.danger-btn { background: var(--danger); color: #fff; }
+    button.danger-btn:hover { background: #c03030; }
+    button.ok-btn { background: var(--ok); color: #fff; }
+    button.ok-btn:hover { background: #2e9050; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 18px; background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .logo { font-size: 20px; font-weight: 800; letter-spacing: -.5px; color: var(--accent); font-family: var(--mono); }
+    .logo span { color: var(--text); font-weight: 400; }
+    .nav-link {
+      text-decoration: none; color: var(--text-dim); font-size: 13px;
+      padding: 6px 12px; border-radius: var(--radius); border: 1px solid var(--border); transition: all .15s;
+    }
+    .nav-link:hover { color: var(--accent); border-color: var(--accent); }
+
+    .tabs { display: flex; gap: 2px; margin-bottom: 12px; }
+    .tabs button {
+      padding: 8px 18px; font-size: 13px; font-weight: 600; width: auto;
+      background: var(--surface); color: var(--text-dim); border: 1px solid var(--border);
+      border-bottom: none; border-radius: var(--radius) var(--radius) 0 0;
+    }
+    .tabs button.active { background: var(--panel); color: var(--accent); border-color: var(--accent); }
+
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+    .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .panel-header strong { font-size: 13px; text-transform: uppercase; letter-spacing: .5px; }
+
+    .status-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 3px;
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+    }
+    .status-badge.draft    { background: rgba(130,138,152,.12); color: var(--text-dim); }
+    .status-badge.ordered  { background: rgba(74,144,196,.12);  color: var(--info); }
+    .status-badge.partial  { background: rgba(212,135,14,.12);  color: var(--accent); }
+    .status-badge.received { background: rgba(59,165,93,.12);   color: var(--ok); }
+    .status-badge.cancelled { background: rgba(212,64,64,.12);  color: var(--danger); }
+
+    .filter-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+    .filter-row input  { flex: 1; min-width: 200px; max-width: 340px; }
+    .filter-row select { width: auto; min-width: 140px; }
+    .filter-row button { width: auto; padding: 8px 16px; }
+
+    /* Purchase order cards */
+    .po-card {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: 8px; background: var(--panel-2); transition: border-color .15s;
+    }
+    .po-card:hover { border-color: var(--accent); }
+    .po-card.expanded { border-color: var(--accent); }
+    .po-card-header {
+      display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+      cursor: pointer; user-select: none;
+    }
+    .po-number { font-weight: 700; font-size: 14px; font-family: var(--mono); color: var(--accent); }
+    .po-supplier { font-size: 12px; color: var(--text-dim); }
+    .po-meta { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .qty-pill {
+      font-size: 11px; font-family: var(--mono);
+      padding: 2px 8px; background: var(--surface); border-radius: 4px; color: var(--text-dim);
+    }
+    .po-body { border-top: 1px solid var(--border); padding: 14px; display: none; }
+    .po-card.expanded .po-body { display: block; }
+
+    /* Receive form */
+    .receive-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .receive-table th {
+      text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
+      color: var(--text-dim); padding: 4px 8px; border-bottom: 1px solid var(--border);
+    }
+    .receive-table td { padding: 7px 8px; border-bottom: 1px solid rgba(255,255,255,.03); vertical-align: middle; }
+    .receive-table tr:last-child td { border-bottom: none; }
+    .receive-table input[type="number"] { width: 90px; padding: 4px 6px; font-family: var(--mono); }
+    .recv-pid { font-family: var(--mono); font-size: 11px; color: var(--info); }
+    .recv-prog { font-family: var(--mono); font-size: 12px; }
+    .recv-done { color: var(--ok); font-weight: 700; }
+
+    .po-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .po-actions button { width: auto; padding: 7px 14px; font-size: 12px; }
+
+    /* Low stock suggestions */
+    .suggest-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .suggest-table th {
+      text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
+      color: var(--text-dim); padding: 4px 8px; border-bottom: 1px solid var(--border);
+    }
+    .suggest-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.03); }
+    .suggest-table tr:last-child td { border-bottom: none; }
+    .suggest-table .stat-out  { color: var(--danger); font-weight: 700; }
+    .suggest-table .stat-low  { color: var(--warn); font-weight: 700; }
+    .suggest-table .stat-ok   { color: var(--ok); }
+    .suggest-table .suggest-btn { width: auto; padding: 3px 8px; font-size: 10px; }
+    .supplier-link {
+      font-size: 10px; color: var(--info); text-decoration: none;
+    }
+    .supplier-link:hover { color: var(--accent); text-decoration: underline; }
+
+    /* Webhooks */
+    .wh-card {
+      display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--panel-2); margin-bottom: 6px;
+    }
+    .wh-name { font-weight: 600; font-size: 13px; }
+    .wh-url  { font-size: 11px; color: var(--text-dim); font-family: var(--mono); word-break: break-all; flex: 1; }
+    .wh-events { display: flex; gap: 4px; flex-wrap: wrap; }
+    .wh-event-tag {
+      font-size: 9px; padding: 1px 6px; border-radius: 3px; font-weight: 700;
+      background: rgba(74,144,196,.1); color: var(--info); border: 1px solid rgba(74,144,196,.2);
+    }
+    .wh-status { font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 700; }
+    .wh-status.active { background: rgba(59,165,93,.1); color: var(--ok); }
+    .wh-status.inactive { background: rgba(130,138,152,.1); color: var(--text-dim); }
+    .wh-del-btn { width: auto; padding: 4px 8px; font-size: 10px; }
+
+    /* Cycle counts */
+    .cc-card {
+      padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--panel-2); margin-bottom: 6px;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .cc-part { font-weight: 600; font-size: 13px; flex: 1; }
+    .cc-part span { font-size: 11px; color: var(--text-dim); font-family: var(--mono); }
+    .cc-date { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+    .cc-counts { font-family: var(--mono); font-size: 12px; }
+    .cc-disc.pos { color: var(--ok); }
+    .cc-disc.neg { color: var(--danger); }
+    .cc-pending-actions { display: flex; gap: 6px; align-items: center; }
+    .cc-pending-actions input { width: 80px; padding: 4px 6px; font-family: var(--mono); }
+    .cc-pending-actions button { width: auto; padding: 5px 10px; font-size: 11px; }
+    .cc-status-badge {
+      font-size: 10px; padding: 2px 7px; border-radius: 3px; font-weight: 700;
+    }
+    .cc-status-badge.pending   { background: rgba(212,135,14,.12); color: var(--accent); }
+    .cc-status-badge.completed { background: rgba(59,165,93,.12);  color: var(--ok); }
+    .cc-status-badge.skipped   { background: rgba(130,138,152,.12); color: var(--text-dim); }
+
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.65); z-index: 100;
+      justify-content: center; align-items: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; width: 520px;
+      max-width: 95vw; max-height: 90vh; overflow-y: auto;
+    }
+    .modal h2 { font-size: 16px; margin-bottom: 14px; }
+    .modal .field { margin-bottom: 12px; }
+    .modal .field label { display: block; margin-bottom: 3px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+    .modal-actions button { width: auto; padding: 8px 18px; }
+    .modal-line-list { margin-top: 8px; }
+    .modal-line-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 6px; align-items: center; margin-bottom: 6px; }
+    .modal-line-row select { font-size: 12px; }
+    .modal-line-row input { font-size: 12px; }
+    .modal-line-row button { width: auto; padding: 4px 8px; font-size: 11px; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 20px; right: 20px; z-index: 300;
+      padding: 10px 18px; border-radius: var(--radius); font-size: 13px; font-weight: 600;
+      opacity: 0; transition: opacity .3s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+    .toast.success { background: var(--ok); color: #fff; }
+    .toast.error   { background: var(--danger); color: #fff; }
+
+    .empty-state { color: var(--text-dim); text-align: center; padding: 32px 0; font-size: 13px; }
+    .section-title {
+      font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--accent);
+      font-weight: 700; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">STOCKNET <span>// Procurement</span></div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <a href="/bom" class="nav-link">BOM Manager</a>
+      <a href="/orders" class="nav-link">Production Orders</a>
+      <a href="/" class="nav-link">&larr; Dashboard</a>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="active" data-tab="supplier">Supplier Orders</button>
+    <button data-tab="suggest">Reorder Suggestions</button>
+    <button data-tab="cycle">Cycle Counts</button>
+    <button data-tab="webhooks">Webhooks</button>
+  </div>
+
+  <!-- ═══  SUPPLIER ORDERS ═══ -->
+  <div id="tabSupplier">
+    <div class="panel">
+      <div class="panel-header">
+        <strong>Purchase Orders</strong>
+        <button id="newPoBtn" style="width:auto;padding:7px 16px;font-size:12px;">+ New PO</button>
+      </div>
+      <div class="filter-row">
+        <input type="text" id="poSearch" placeholder="Search order number, supplier..." />
+        <select id="poStatusFilter">
+          <option value="">All Statuses</option>
+          <option value="draft">Draft</option>
+          <option value="ordered">Ordered</option>
+          <option value="partial">Partial</option>
+          <option value="received">Received</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div id="poList"><div class="empty-state">Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- ═══  REORDER SUGGESTIONS ═══ -->
+  <div id="tabSuggest" style="display:none;">
+    <div class="panel">
+      <div class="panel-header">
+        <strong>Reorder Suggestions</strong>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="secondary" id="exportSuggestBtn" style="width:auto;padding:6px 12px;font-size:12px;">&#8681; Export CSV</button>
+          <button class="secondary" id="refreshSuggestBtn" style="width:auto;padding:6px 12px;font-size:12px;">&#8635; Refresh</button>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">
+        Components below minimum threshold or predicted stockout within lead time.
+        Velocity is based on completed production orders in the last 90 days.
+      </div>
+      <div id="suggestContent"><div class="empty-state">Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- ═══  CYCLE COUNTS ═══ -->
+  <div id="tabCycle" style="display:none;">
+    <div class="panel">
+      <div class="panel-header">
+        <strong>Cycle Count Schedules</strong>
+        <button id="newCcBtn" style="width:auto;padding:7px 16px;font-size:12px;">+ Schedule Count</button>
+      </div>
+      <div id="cycleList"><div class="empty-state">Loading...</div></div>
+    </div>
+  </div>
+
+  <!-- ═══  WEBHOOKS ═══ -->
+  <div id="tabWebhooks" style="display:none;">
+    <div class="panel">
+      <div class="panel-header">
+        <strong>Outbound Webhooks</strong>
+        <button id="newWhBtn" style="width:auto;padding:7px 16px;font-size:12px;">+ New Webhook</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">
+        Webhooks fire outbound HTTP POSTs when events occur. Events:
+        <code style="background:var(--surface);padding:1px 5px;border-radius:3px;font-size:11px;">low_stock</code>
+        <code style="background:var(--surface);padding:1px 5px;border-radius:3px;font-size:11px;">low_battery</code>
+        <code style="background:var(--surface);padding:1px 5px;border-radius:3px;font-size:11px;">order_confirmed</code>
+        <code style="background:var(--surface);padding:1px 5px;border-radius:3px;font-size:11px;">order_completed</code>
+        <code style="background:var(--surface);padding:1px 5px;border-radius:3px;font-size:11px;">supplier_received</code>
+      </div>
+      <div id="whList"><div class="empty-state">Loading...</div></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- New PO Modal -->
+<div class="modal-overlay" id="newPoModal">
+  <div class="modal">
+    <h2>New Purchase Order</h2>
+    <div class="form-row">
+      <div class="field">
+        <label>PO Number</label>
+        <input id="poNum" type="text" placeholder="e.g. PO-2026-042" />
+      </div>
+      <div class="field">
+        <label>Supplier</label>
+        <input id="poSupplier" type="text" placeholder="Supplier name" />
+      </div>
+    </div>
+    <div class="form-row" style="margin-top:10px;">
+      <div class="field">
+        <label>Order Date</label>
+        <input id="poOrderDate" type="date" />
+      </div>
+      <div class="field">
+        <label>Expected Delivery</label>
+        <input id="poExpected" type="date" />
+      </div>
+    </div>
+    <div class="field" style="margin-top:10px;">
+      <label>Notes</label>
+      <textarea id="poNotes" placeholder="Optional notes..."></textarea>
+    </div>
+    <div style="margin-top:12px;">
+      <div class="section-title">Line Items</div>
+      <div id="poModalLines" class="modal-line-list"></div>
+      <button id="addPoLineBtn" class="secondary" style="width:auto;padding:6px 12px;font-size:12px;margin-top:6px;">+ Add Line</button>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" id="poModalCancel">Cancel</button>
+      <button id="poModalSave">Create PO</button>
+    </div>
+  </div>
+</div>
+
+<!-- Webhook Modal -->
+<div class="modal-overlay" id="whModal">
+  <div class="modal">
+    <h2 id="whModalTitle">New Webhook</h2>
+    <div class="field">
+      <label>Name</label>
+      <input id="whName" type="text" placeholder="e.g. Slack Low Stock Alert" />
+    </div>
+    <div class="field">
+      <label>URL</label>
+      <input id="whUrl" type="url" placeholder="https://hooks.slack.com/..." />
+    </div>
+    <div class="field">
+      <label>Events to fire on</label>
+      <div style="display:flex;flex-direction:column;gap:4px;margin-top:4px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;text-transform:none;letter-spacing:0;">
+          <input type="checkbox" id="whEvLowStock"  style="width:auto;" /> Low Stock
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;text-transform:none;letter-spacing:0;">
+          <input type="checkbox" id="whEvLowBatt"   style="width:auto;" /> Low Battery
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;text-transform:none;letter-spacing:0;">
+          <input type="checkbox" id="whEvOrdConfirm" style="width:auto;" /> Order Confirmed
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;text-transform:none;letter-spacing:0;">
+          <input type="checkbox" id="whEvOrdComplete" style="width:auto;" /> Order Completed
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;text-transform:none;letter-spacing:0;">
+          <input type="checkbox" id="whEvSupplier" style="width:auto;" /> Supplier Received
+        </label>
+      </div>
+    </div>
+    <div class="field">
+      <label>Signing Secret (optional — HMAC-SHA256)</label>
+      <input id="whSecret" type="text" placeholder="Leave blank for unsigned requests" />
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" id="whModalCancel">Cancel</button>
+      <button id="whModalSave">Save Webhook</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cycle Count Modal -->
+<div class="modal-overlay" id="ccModal">
+  <div class="modal" style="width:400px;">
+    <h2>Schedule Cycle Count</h2>
+    <div class="field">
+      <label>Item</label>
+      <select id="ccItem">
+        <option value="">Select component or assembly...</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Scheduled Date</label>
+      <input id="ccDate" type="date" />
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" id="ccModalCancel">Cancel</button>
+      <button id="ccModalSave">Schedule</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══  STATE  ═══ */
+const S = {
+  poList: [], components: [], assemblies: [], cycleCounts: [], webhooks: [],
+  velocity: [], expandedPoId: null, activeTab: 'supplier',
+  poModalLines: [],
+};
+
+/* ═══  HELPERS  ═══ */
+function $(id) { return document.getElementById(id); }
+function toast(msg, type = 'success') {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = `toast show ${type}`;
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+function statusBadge(s) {
+  return `<span class="status-badge ${s}">${s}</span>`;
+}
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'});
+}
+
+/* ═══  TABS  ═══ */
+document.querySelectorAll('.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    S.activeTab = btn.dataset.tab;
+    $('tabSupplier').style.display = S.activeTab === 'supplier'  ? '' : 'none';
+    $('tabSuggest').style.display  = S.activeTab === 'suggest'   ? '' : 'none';
+    $('tabCycle').style.display    = S.activeTab === 'cycle'     ? '' : 'none';
+    $('tabWebhooks').style.display = S.activeTab === 'webhooks'  ? '' : 'none';
+    if (S.activeTab === 'suggest' && !S.velocity.length) fetchVelocity();
+    if (S.activeTab === 'cycle')    fetchCycleCounts();
+    if (S.activeTab === 'webhooks') fetchWebhooks();
+  });
+});
+
+/* ═══  FETCH  ═══ */
+async function fetchPOs() {
+  const r = await fetch('/api/supplier-orders');
+  const d = await r.json();
+  S.poList = d.orders || [];
+  renderPOs();
+}
+async function fetchComponents() {
+  const r = await fetch('/api/components');
+  const d = await r.json();
+  S.components = d.components || [];
+}
+async function fetchAssemblies() {
+  const r = await fetch('/api/assemblies');
+  const d = await r.json();
+  S.assemblies = d.assemblies || [];
+}
+async function fetchVelocity() {
+  $('suggestContent').innerHTML = '<div class="empty-state">Calculating...</div>';
+  const r = await fetch('/api/inventory/velocity');
+  const d = await r.json();
+  S.velocity = d.velocity || [];
+  renderSuggestions();
+}
+async function fetchCycleCounts() {
+  const r = await fetch('/api/cycle-counts');
+  const d = await r.json();
+  S.cycleCounts = d.cycle_counts || [];
+  renderCycleCounts();
+}
+async function fetchWebhooks() {
+  const r = await fetch('/api/webhooks');
+  const d = await r.json();
+  S.webhooks = d.webhooks || [];
+  renderWebhooks();
+}
+
+/* ═══  SUPPLIER ORDERS  ═══ */
+function renderPOs() {
+  const search = $('poSearch').value.trim().toLowerCase();
+  const sf = $('poStatusFilter').value;
+  let list = S.poList.filter(o => {
+    if (sf && o.status !== sf) return false;
+    if (search && !(o.order_number||'').toLowerCase().includes(search) &&
+        !(o.supplier_name||'').toLowerCase().includes(search)) return false;
+    return true;
+  });
+  const el = $('poList');
+  if (!list.length) { el.innerHTML = '<div class="empty-state">No purchase orders found.</div>'; return; }
+  el.innerHTML = list.map(o => {
+    const expanded = S.expandedPoId === o.supplier_order_id;
+    const pct = o.total_ordered > 0 ? Math.round((o.total_received / o.total_ordered) * 100) : 0;
+    return `
+      <div class="po-card ${expanded ? 'expanded' : ''}" data-po-id="${o.supplier_order_id}">
+        <div class="po-card-header" onclick="togglePo('${o.supplier_order_id}')">
+          <div>
+            <div class="po-number">${o.order_number || '(no PO#)'}</div>
+            <div class="po-supplier">${o.supplier_name || 'Unspecified supplier'}</div>
+          </div>
+          ${statusBadge(o.status)}
+          <div class="po-meta">
+            <span class="qty-pill">${o.line_count} line${o.line_count !== 1 ? 's' : ''}</span>
+            <span class="qty-pill">${o.total_received}/${o.total_ordered} rcvd</span>
+            ${o.expected_delivery ? `<span style="font-size:11px;color:var(--text-dim);">ETA ${fmtDate(o.expected_delivery)}</span>` : ''}
+            <span style="color:var(--text-dim);font-size:14px;">${expanded ? '▲' : '▼'}</span>
+          </div>
+        </div>
+        ${expanded ? `<div class="po-body" id="poBody_${o.supplier_order_id}">Loading...</div>` : ''}
+      </div>`;
+  }).join('');
+  if (S.expandedPoId) loadPoDetail(S.expandedPoId);
+}
+
+async function togglePo(poId) {
+  S.expandedPoId = S.expandedPoId === poId ? null : poId;
+  renderPOs();
+}
+
+async function loadPoDetail(poId) {
+  const r = await fetch(`/api/supplier-orders/${poId}`);
+  const d = await r.json();
+  const el = $(`poBody_${poId}`);
+  if (!el || !d.ok) return;
+  const o = d.order;
+  const canReceive = ['ordered','partial'].includes(o.status);
+  const canPlace   = o.status === 'draft';
+
+  const linesHtml = d.lines.length === 0
+    ? '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">No line items.</div>'
+    : `<table class="receive-table">
+        <tr><th>Part ID</th><th>Component</th><th>On Hand</th><th>Ordered</th><th>Received</th>
+          ${canReceive ? '<th>Receive Qty</th>' : ''}
+        </tr>
+        ${d.lines.map(l => {
+          const done = l.qty_received >= l.qty_ordered;
+          return `<tr>
+            <td class="recv-pid">${l.part_id}</td>
+            <td>
+              ${l.part_name}
+              ${l.supplier_url ? `<a class="supplier-link" href="${l.supplier_url}" target="_blank" rel="noopener"> ↗</a>` : ''}
+            </td>
+            <td class="recv-prog">${l.current_stock}</td>
+            <td class="recv-prog">${l.qty_ordered}</td>
+            <td class="recv-prog ${done ? 'recv-done' : ''}">${l.qty_received}${done ? ' ✔' : ''}</td>
+            ${canReceive ? `<td><input type="number" min="0" value="0" id="recv_${l.line_id}" data-line="${l.line_id}" style="width:80px;" /></td>` : ''}
+          </tr>`;
+        }).join('')}
+      </table>`;
+
+  el.innerHTML = `
+    ${o.notes ? `<div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;padding:8px;background:var(--surface);border-radius:4px;">${o.notes}</div>` : ''}
+    ${linesHtml}
+    <div class="po-actions">
+      ${canPlace   ? `<button onclick="placePO('${poId}')">&#9993; Mark as Ordered</button>` : ''}
+      ${canReceive ? `<button class="ok-btn" onclick="receiveItems('${poId}')">&#8595; Receive Items</button>` : ''}
+      <span style="margin-left:auto;font-size:11px;color:var(--text-dim);">
+        Created ${fmtDate(o.created_at)}
+        ${o.ordered_at ? ' · Ordered ' + fmtDate(o.ordered_at) : ''}
+        ${o.received_at ? ' · Received ' + fmtDate(o.received_at) : ''}
+      </span>
+    </div>`;
+}
+
+async function placePO(poId) {
+  const r = await fetch(`/api/supplier-orders/${poId}/place`, { method: 'POST' });
+  const d = await r.json();
+  if (d.ok) { toast('PO marked as ordered', 'success'); await fetchPOs(); }
+  else toast(d.error || 'Failed', 'error');
+}
+
+async function receiveItems(poId) {
+  const inputs = document.querySelectorAll(`#poBody_${poId} input[data-line]`);
+  const receipts = [];
+  for (const inp of inputs) {
+    const qty = parseFloat(inp.value);
+    if (qty > 0) receipts.push({ line_id: inp.dataset.line, qty_received: qty });
+  }
+  if (!receipts.length) { toast('Enter quantities to receive', 'error'); return; }
+  const r = await fetch(`/api/supplier-orders/${poId}/receive`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ line_receipts: receipts }),
+  });
+  const d = await r.json();
+  if (d.ok) {
+    const synced = d.commands_enqueued?.length || 0;
+    toast(`Stock received${synced ? ` · ${synced} counters synced` : ''}`, 'success');
+    await fetchPOs();
+  } else toast(d.error || 'Failed', 'error');
+}
+
+/* ═══  NEW PO MODAL  ═══ */
+function renderPoModalLines() {
+  const compOpts = S.components.map(c =>
+    `<option value="${c.component_id}">${c.part_id} — ${c.part_name}</option>`
+  ).join('');
+  $('poModalLines').innerHTML = S.poModalLines.map((_, i) => `
+    <div class="modal-line-row">
+      <select id="poLineComp_${i}">${compOpts}</select>
+      <input type="number" id="poLineQty_${i}" min="1" value="1" placeholder="Qty" />
+      <input type="number" id="poLineCost_${i}" min="0" step="0.01" placeholder="Unit $" style="width:80px;" />
+      <button class="danger-btn" style="padding:4px 8px;" onclick="removePoLine(${i})">✕</button>
+    </div>`).join('');
+  // Restore values
+  S.poModalLines.forEach((l, i) => {
+    const cs = $(`poLineComp_${i}`); const qs = $(`poLineQty_${i}`); const cos = $(`poLineCost_${i}`);
+    if (cs) cs.value = l.component_id || '';
+    if (qs) qs.value = l.qty || 1;
+    if (cos) cos.value = l.cost || '';
+  });
+}
+
+$('addPoLineBtn').addEventListener('click', () => {
+  S.poModalLines.push({ component_id: '', qty: 1, cost: '' });
+  renderPoModalLines();
+});
+function removePoLine(i) {
+  S.poModalLines.splice(i, 1);
+  renderPoModalLines();
+}
+
+$('newPoBtn').addEventListener('click', () => {
+  $('poNum').value = ''; $('poSupplier').value = '';
+  $('poOrderDate').value = ''; $('poExpected').value = ''; $('poNotes').value = '';
+  S.poModalLines = [{ component_id: '', qty: 1, cost: '' }];
+  renderPoModalLines();
+  $('newPoModal').classList.add('open');
+  $('poNum').focus();
+});
+$('poModalCancel').addEventListener('click', () => $('newPoModal').classList.remove('open'));
+$('newPoModal').addEventListener('click', e => { if (e.target === e.currentTarget) $('newPoModal').classList.remove('open'); });
+
+$('poModalSave').addEventListener('click', async () => {
+  const lines = [];
+  S.poModalLines.forEach((_, i) => {
+    const cid  = $(`poLineComp_${i}`)?.value;
+    const qty  = parseFloat($(`poLineQty_${i}`)?.value);
+    const cost = parseFloat($(`poLineCost_${i}`)?.value) || null;
+    if (cid && qty > 0) lines.push({ component_id: cid, qty_ordered: qty, unit_cost: cost });
+  });
+  const r = await fetch('/api/supplier-orders', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      order_number:      $('poNum').value.trim() || null,
+      supplier_name:     $('poSupplier').value.trim() || null,
+      ordered_at:        $('poOrderDate').value || null,
+      expected_delivery: $('poExpected').value || null,
+      notes:             $('poNotes').value.trim() || null,
+      lines,
+    }),
+  });
+  const d = await r.json();
+  if (d.ok) {
+    toast('Purchase order created', 'success');
+    $('newPoModal').classList.remove('open');
+    S.expandedPoId = d.supplier_order_id;
+    await fetchPOs();
+  } else toast(d.error || 'Failed', 'error');
+});
+
+/* ═══  REORDER SUGGESTIONS  ═══ */
+function renderSuggestions() {
+  const items = S.velocity.filter(v => {
+    const deficit = (v.min_threshold || 0) - v.available;
+    return deficit > 0 || v.reorder_alert;
+  });
+
+  if (!items.length) {
+    $('suggestContent').innerHTML = '<div class="empty-state">All components are adequately stocked.</div>';
+    return;
+  }
+
+  $('suggestContent').innerHTML = `
+    <table class="suggest-table">
+      <tr>
+        <th>Part ID</th><th>Component</th><th>Available</th>
+        <th>Min Threshold</th><th>Daily Rate</th><th>Days Left</th>
+        <th>Suggest Order</th><th>Supplier</th>
+      </tr>
+      ${items.map(v => {
+        const avail = v.available;
+        const thresh = v.min_threshold || 0;
+        const deficit = Math.max(0, thresh - avail);
+        const isOut = avail <= 0;
+        const statCls = isOut ? 'stat-out' : 'stat-low';
+        const suggested = Math.max(deficit, thresh, v.min_order_qty || 1);
+        return `<tr>
+          <td style="font-family:var(--mono);font-size:11px;color:var(--info);">${v.part_id}</td>
+          <td>${v.part_name}</td>
+          <td class="${statCls}">${avail.toFixed(0)}</td>
+          <td style="font-family:var(--mono);">${thresh}</td>
+          <td style="font-family:var(--mono);font-size:11px;">${v.daily_rate > 0 ? v.daily_rate.toFixed(2)+'/day' : '—'}</td>
+          <td style="font-family:var(--mono);font-size:11px;${v.reorder_alert ? 'color:var(--warn);font-weight:700;' : ''}">${v.days_remaining != null ? v.days_remaining+'d' : '—'}</td>
+          <td style="font-family:var(--mono);font-weight:700;color:var(--accent);">${suggested}</td>
+          <td></td>
+        </tr>`;
+      }).join('')}
+    </table>`;
+}
+
+$('refreshSuggestBtn').addEventListener('click', fetchVelocity);
+$('exportSuggestBtn').addEventListener('click', () => window.open('/api/inventory/export', '_blank'));
+
+/* ═══  CYCLE COUNTS  ═══ */
+function renderCycleCounts() {
+  const el = $('cycleList');
+  if (!S.cycleCounts.length) {
+    el.innerHTML = '<div class="empty-state">No cycle count schedules yet.</div>';
+    return;
+  }
+  el.innerHTML = S.cycleCounts.map(cc => {
+    const name = cc.part_name || cc.assembly_name || '—';
+    const code = cc.part_id   || cc.assembly_code || '';
+    const isPending = cc.status === 'pending';
+    return `
+      <div class="cc-card">
+        <div class="cc-part">
+          ${name} <span>${code}</span>
+        </div>
+        <div class="cc-date">${fmtDate(cc.scheduled_date)}</div>
+        <span class="cc-status-badge ${cc.status}">${cc.status}</span>
+        ${cc.status === 'completed' ? `
+          <div class="cc-counts">
+            Sys: ${cc.system_count ?? '?'} · Confirmed: ${cc.confirmed_count ?? '?'}
+            <span class="cc-disc ${cc.discrepancy > 0 ? 'pos' : cc.discrepancy < 0 ? 'neg' : ''}">
+              ${cc.discrepancy != null ? (cc.discrepancy >= 0 ? '+' : '') + cc.discrepancy : ''}
+            </span>
+          </div>` : ''}
+        ${isPending ? `
+          <div class="cc-pending-actions">
+            <span style="font-size:11px;color:var(--text-dim);">Count:</span>
+            <input type="number" id="ccCount_${cc.schedule_id}" min="0" placeholder="Actual qty" />
+            <button onclick="completeCc('${cc.schedule_id}',false)">Record</button>
+            <button class="ok-btn" onclick="completeCc('${cc.schedule_id}',true)" title="Record and adjust inventory to match">Record &amp; Reconcile</button>
+          </div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+async function completeCc(schedId, adjustInventory) {
+  const countEl = $(`ccCount_${schedId}`);
+  const confirmed = parseFloat(countEl?.value);
+  if (isNaN(confirmed)) { toast('Enter a count value', 'error'); return; }
+  const r = await fetch(`/api/cycle-counts/${schedId}`, {
+    method: 'PUT', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ confirmed_count: confirmed, adjust_inventory: adjustInventory }),
+  });
+  const d = await r.json();
+  if (d.ok) {
+    const disc = d.discrepancy;
+    toast(`Count recorded${disc !== 0 ? ` (discrepancy: ${disc >= 0 ? '+' : ''}${disc})` : ''}${adjustInventory ? ' · Inventory adjusted' : ''}`, 'success');
+    await fetchCycleCounts();
+  } else toast(d.error || 'Failed', 'error');
+}
+
+// Schedule cycle count modal
+$('newCcBtn').addEventListener('click', () => {
+  const compOpts = S.components.map(c =>
+    `<option value="comp:${c.component_id}">${c.part_id} — ${c.part_name}</option>`
+  ).join('');
+  const asmOpts = S.assemblies.map(a =>
+    `<option value="asm:${a.assembly_id}">${a.assembly_code} — ${a.assembly_name}</option>`
+  ).join('');
+  $('ccItem').innerHTML = `<option value="">Select item...</option>
+    <optgroup label="Components">${compOpts}</optgroup>
+    <optgroup label="Assemblies">${asmOpts}</optgroup>`;
+  $('ccDate').value = new Date().toISOString().slice(0, 10);
+  $('ccModal').classList.add('open');
+});
+$('ccModalCancel').addEventListener('click', () => $('ccModal').classList.remove('open'));
+$('ccModal').addEventListener('click', e => { if (e.target === e.currentTarget) $('ccModal').classList.remove('open'); });
+
+$('ccModalSave').addEventListener('click', async () => {
+  const val = $('ccItem').value;
+  const sched = $('ccDate').value;
+  if (!val || !sched) { toast('Select an item and date', 'error'); return; }
+  const [type, id] = val.split(':');
+  const body = { scheduled_date: sched };
+  if (type === 'comp') body.component_id = id;
+  else body.assembly_id = id;
+  const r = await fetch('/api/cycle-counts', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+  const d = await r.json();
+  if (d.ok) {
+    toast('Cycle count scheduled', 'success');
+    $('ccModal').classList.remove('open');
+    await fetchCycleCounts();
+  } else toast(d.error || 'Failed', 'error');
+});
+
+/* ═══  WEBHOOKS  ═══ */
+function renderWebhooks() {
+  const el = $('whList');
+  if (!S.webhooks.length) {
+    el.innerHTML = '<div class="empty-state">No webhooks configured.</div>';
+    return;
+  }
+  el.innerHTML = S.webhooks.map(w => `
+    <div class="wh-card">
+      <div style="min-width:160px;">
+        <div class="wh-name">${w.name}</div>
+        <span class="wh-status ${w.is_active ? 'active' : 'inactive'}">${w.is_active ? 'Active' : 'Inactive'}</span>
+      </div>
+      <div class="wh-url">${w.url}</div>
+      <div class="wh-events">
+        ${(w.event_types||[]).map(e => `<span class="wh-event-tag">${e}</span>`).join('')}
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button class="secondary wh-del-btn" onclick="toggleWebhook('${w.webhook_id}',${!w.is_active})">${w.is_active ? 'Disable' : 'Enable'}</button>
+        <button class="danger-btn wh-del-btn" onclick="deleteWebhook('${w.webhook_id}')">Delete</button>
+      </div>
+    </div>`).join('');
+}
+
+$('newWhBtn').addEventListener('click', () => {
+  $('whName').value = ''; $('whUrl').value = ''; $('whSecret').value = '';
+  ['whEvLowStock','whEvLowBatt','whEvOrdConfirm','whEvOrdComplete','whEvSupplier'].forEach(id => $(id).checked = false);
+  $('whModalTitle').textContent = 'New Webhook';
+  $('whModal').classList.add('open');
+  $('whName').focus();
+});
+$('whModalCancel').addEventListener('click', () => $('whModal').classList.remove('open'));
+$('whModal').addEventListener('click', e => { if (e.target === e.currentTarget) $('whModal').classList.remove('open'); });
+
+$('whModalSave').addEventListener('click', async () => {
+  const name = $('whName').value.trim();
+  const url  = $('whUrl').value.trim();
+  if (!name || !url) { toast('Name and URL are required', 'error'); return; }
+  const events = [];
+  if ($('whEvLowStock').checked)    events.push('low_stock');
+  if ($('whEvLowBatt').checked)     events.push('low_battery');
+  if ($('whEvOrdConfirm').checked)  events.push('order_confirmed');
+  if ($('whEvOrdComplete').checked) events.push('order_completed');
+  if ($('whEvSupplier').checked)    events.push('supplier_received');
+  if (!events.length) { toast('Select at least one event', 'error'); return; }
+  const r = await fetch('/api/webhooks', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ name, url, event_types: events, secret: $('whSecret').value.trim() || null }),
+  });
+  const d = await r.json();
+  if (d.ok) {
+    toast('Webhook created', 'success');
+    $('whModal').classList.remove('open');
+    await fetchWebhooks();
+  } else toast(d.error || 'Failed', 'error');
+});
+
+async function toggleWebhook(id, active) {
+  const r = await fetch(`/api/webhooks/${id}`, {
+    method: 'PUT', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ is_active: active }),
+  });
+  const d = await r.json();
+  if (d.ok) { await fetchWebhooks(); }
+  else toast(d.error || 'Failed', 'error');
+}
+async function deleteWebhook(id) {
+  if (!confirm('Delete this webhook?')) return;
+  const r = await fetch(`/api/webhooks/${id}`, { method: 'DELETE' });
+  const d = await r.json();
+  if (d.ok) { toast('Webhook deleted', 'success'); await fetchWebhooks(); }
+  else toast(d.error || 'Failed', 'error');
+}
+
+/* ═══  KEYBOARD  ═══ */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    $('newPoModal').classList.remove('open');
+    $('whModal').classList.remove('open');
+    $('ccModal').classList.remove('open');
+  }
+});
+
+/* ═══  FILTER LISTENERS  ═══ */
+let poSearchTO = null;
+$('poSearch').addEventListener('input', () => { clearTimeout(poSearchTO); poSearchTO = setTimeout(renderPOs, 200); });
+$('poStatusFilter').addEventListener('change', renderPOs);
+
+/* ═══  INIT  ═══ */
+(async function init() {
+  await Promise.all([fetchPOs(), fetchComponents(), fetchAssemblies()]);
+})();
+</script>
+</body>
+</html>

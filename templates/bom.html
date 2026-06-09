@@ -1,0 +1,2053 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>StockNet - BOM Manager</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" crossorigin="anonymous"></script>
+  <style>
+    /* ═══════════════════  INDUSTRIAL THEME (shared)  ═══════════════════ */
+    :root {
+      --bg:       #121417;
+      --panel:    #1b1e24;
+      --panel-2:  #23272f;
+      --surface:  #2a2f38;
+      --text:     #d8dce3;
+      --text-dim: #828a98;
+      --border:   #33393f;
+      --accent:   #d4870e;
+      --accent-2: #e69b1e;
+      --ok:       #3ba55d;
+      --warn:     #e8a418;
+      --danger:   #d44040;
+      --info:     #4a90c4;
+      --mono:     'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+      --radius:   6px;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body { font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .wrap { max-width: 1700px; margin: 0 auto; padding: 12px 16px; }
+
+    /* ── Forms ── */
+    label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .6px; }
+    input, select, button {
+      border-radius: var(--radius); border: 1px solid var(--border);
+      background: var(--surface); color: var(--text);
+      padding: 8px 10px; font-size: 13px; width: 100%;
+    }
+    input::placeholder { color: var(--text-dim); opacity: .5; }
+    button {
+      cursor: pointer; background: var(--accent); color: #000;
+      font-weight: 700; border: none; transition: background .15s;
+    }
+    button:hover { background: var(--accent-2); }
+    button.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    button.secondary:hover { border-color: var(--accent); color: var(--accent); }
+    button.danger-btn { background: var(--danger); color: #fff; }
+    button.danger-btn:hover { background: #c03030; }
+    button.ok-btn { background: var(--ok); color: #fff; }
+    button.ok-btn:hover { background: #2e9050; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+
+    /* ── Header ── */
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 18px; background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .logo {
+      font-size: 20px; font-weight: 800; letter-spacing: -0.5px;
+      color: var(--accent); font-family: var(--mono);
+    }
+    .logo span { color: var(--text); font-weight: 400; }
+    .nav-link {
+      text-decoration: none; color: var(--text-dim); font-size: 13px;
+      padding: 6px 12px; border-radius: var(--radius); border: 1px solid var(--border);
+      transition: all .15s;
+    }
+    .nav-link:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* ── Panels ── */
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px;
+    }
+    .panel-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 10px;
+    }
+    .panel-header strong {
+      font-size: 13px; text-transform: uppercase; letter-spacing: .5px;
+    }
+    .search-row {
+      display: flex; gap: 8px; margin-bottom: 10px;
+    }
+    .search-row input { flex: 1; }
+    .search-row button { width: auto; padding: 8px 14px; }
+
+    /* ── Stock Controls ── */
+    .stock-badge {
+      font-family: var(--mono); font-size: 13px; font-weight: 700;
+      color: var(--accent); background: rgba(212,135,14,.08);
+      padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+    }
+    .stock-badge.zero { color: var(--danger); background: rgba(212,64,64,.1); }
+    .stock-adjust-inline {
+      display: flex; align-items: center; gap: 4px; margin-top: 4px;
+    }
+    .stock-adjust-inline button {
+      width: 26px; height: 26px; padding: 0; font-size: 15px;
+      font-weight: 800; display: flex; align-items: center;
+      justify-content: center; border-radius: 4px;
+      background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    }
+    .stock-adjust-inline button:hover { border-color: var(--accent); color: var(--accent); }
+    .stock-adjust-inline input {
+      width: 56px; text-align: center; font-family: var(--mono);
+      font-size: 13px; padding: 3px 4px;
+    }
+    .asm-stock-row {
+      display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+      background: rgba(212,135,14,.03); border-top: 1px solid var(--border);
+    }
+    .asm-stock-row .stock-badge { font-size: 16px; }
+    .asm-stock-row .stock-adjust-inline input { width: 64px; font-size: 14px; }
+    .asm-stock-info {
+      font-size: 11px; color: var(--text-dim); margin-left: auto;
+    }
+
+    /* ── Battery Indicator ── */
+    .batt-row {
+      display: flex; align-items: center; gap: 4px;
+    }
+    .batt-icon {
+      display: inline-flex; align-items: stretch;
+      width: 22px; height: 12px; border: 1.5px solid var(--text-dim);
+      border-radius: 2px; position: relative; font-size: 0;
+    }
+    .batt-icon::after {
+      content: ''; position: absolute; right: -4px; top: 2px;
+      width: 2px; height: 6px; background: var(--text-dim); border-radius: 0 1px 1px 0;
+    }
+    .batt-icon .batt-fill { height: 100%; border-radius: 1px; }
+    .batt-icon.ok .batt-fill { background: var(--ok); }
+    .batt-icon.warn .batt-fill { background: var(--warn); }
+    .batt-icon.crit .batt-fill { background: var(--danger); }
+    .batt-icon.warn { border-color: var(--warn); }
+    .batt-icon.warn::after { background: var(--warn); }
+    .batt-icon.crit { border-color: var(--danger); }
+    .batt-icon.crit::after { background: var(--danger); }
+    .batt-label { font-size: 9px; font-family: var(--mono); color: var(--text-dim); }
+    .batt-label.warn { color: var(--warn); font-weight: 700; }
+    .batt-label.crit { color: var(--danger); font-weight: 700; }
+
+    /* ── Tabs ── */
+    .tabs { display: flex; gap: 2px; margin-bottom: 12px; }
+    .tabs button {
+      padding: 8px 18px; font-size: 13px; font-weight: 600;
+      background: var(--surface); color: var(--text-dim); border: 1px solid var(--border);
+      border-bottom: none; border-radius: var(--radius) var(--radius) 0 0;
+    }
+    .tabs button.active { background: var(--panel); color: var(--accent); border-color: var(--accent); }
+
+    /* ── Main Grid ── */
+    .bom-grid {
+      display: grid; grid-template-columns: 380px 1fr; gap: 12px;
+      min-height: calc(100vh - 200px);
+    }
+
+    /* ── Component Cards (left panel) ── */
+    .comp-list { overflow-y: auto; max-height: calc(100vh - 260px); }
+    .comp-card {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: 6px; cursor: grab; background: var(--panel-2);
+      transition: border-color .15s, box-shadow .15s;
+      user-select: none;
+    }
+    .comp-card:hover { border-color: var(--accent); }
+    .comp-card:active { cursor: grabbing; }
+    .comp-card.dragging { opacity: .4; }
+    .comp-card .comp-icon {
+      width: 36px; height: 36px; border-radius: 4px;
+      background: var(--surface); display: flex; align-items: center;
+      justify-content: center; font-size: 16px; flex-shrink: 0;
+      color: var(--accent); font-weight: 800; font-family: var(--mono);
+    }
+    .comp-card .comp-detail { flex: 1; min-width: 0; }
+    .comp-card .comp-name {
+      font-weight: 600; font-size: 13px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .comp-card .comp-pid {
+      font-size: 11px; color: var(--text-dim); font-family: var(--mono);
+    }
+    .comp-card .comp-actions {
+      display: flex; gap: 4px; opacity: 0; transition: opacity .15s;
+    }
+    .comp-card:hover .comp-actions { opacity: 1; }
+    .comp-card .comp-actions button {
+      width: auto; padding: 3px 8px; font-size: 10px;
+      background: transparent; color: var(--text-dim); border: 1px solid var(--border);
+    }
+    .comp-card .comp-actions button:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* ── Assembly Panel (right) ── */
+    .asm-list { overflow-y: auto; max-height: calc(100vh - 260px); }
+    .asm-card {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: 10px; background: var(--panel-2);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .asm-card-header {
+      display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+      cursor: pointer; user-select: none;
+    }
+    .asm-card-header:hover { background: rgba(212,135,14,.03); }
+    .asm-card-header .asm-icon {
+      width: 40px; height: 40px; border-radius: 4px;
+      background: rgba(212,135,14,.1); display: flex; align-items: center;
+      justify-content: center; font-size: 18px; flex-shrink: 0;
+    }
+    .asm-card-header .asm-detail { flex: 1; min-width: 0; }
+    .asm-card-header .asm-name {
+      font-weight: 700; font-size: 14px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .asm-card-header .asm-code {
+      font-size: 11px; color: var(--text-dim); font-family: var(--mono);
+    }
+    .asm-card-header .asm-count {
+      font-size: 12px; color: var(--text-dim); font-family: var(--mono);
+      padding: 2px 8px; background: var(--surface); border-radius: 4px;
+    }
+    .asm-card-header .asm-actions {
+      display: flex; gap: 4px;
+    }
+    .asm-card-header .asm-actions button {
+      width: auto; padding: 4px 8px; font-size: 10px;
+      background: transparent; color: var(--text-dim); border: 1px solid var(--border);
+    }
+    .asm-card-header .asm-actions button:hover { color: var(--accent); border-color: var(--accent); }
+
+    .asm-bom {
+      border-top: 1px solid var(--border); padding: 10px 14px;
+    }
+    .asm-bom.drop-active {
+      background: rgba(212,135,14,.06);
+      border-top-color: var(--accent);
+      box-shadow: inset 0 2px 0 var(--accent);
+    }
+    .asm-bom.drop-over {
+      background: rgba(212,135,14,.12);
+    }
+    .bom-empty {
+      color: var(--text-dim); font-size: 12px; padding: 12px 0; text-align: center;
+      border: 2px dashed var(--border); border-radius: var(--radius);
+    }
+    .bom-row {
+      display: flex; align-items: center; gap: 8px; padding: 6px 0;
+      border-bottom: 1px solid rgba(255,255,255,.03); font-size: 13px;
+    }
+    .bom-row:last-child { border-bottom: none; }
+    .bom-row .bom-pid {
+      font-family: var(--mono); font-size: 11px; color: var(--info);
+      min-width: 90px;
+    }
+    .bom-row .bom-name { flex: 1; }
+    .bom-row .bom-qty {
+      font-family: var(--mono); font-weight: 700; font-size: 13px;
+      color: var(--accent); min-width: 30px; text-align: right;
+    }
+    .bom-row .bom-x {
+      font-size: 12px; color: var(--text-dim);
+    }
+    .bom-row .bom-actions {
+      display: flex; gap: 4px;
+    }
+    .bom-row .bom-actions button {
+      width: auto; padding: 2px 6px; font-size: 10px;
+      background: transparent; color: var(--text-dim); border: 1px solid transparent;
+    }
+    .bom-row .bom-actions button:hover { color: var(--danger); border-color: rgba(212,64,64,.3); }
+    .bom-drop-hint {
+      color: var(--accent); font-size: 12px; padding: 10px 0;
+      text-align: center; font-weight: 600;
+    }
+
+    /* ── Counter Badge (shown on component/assembly in BOM tab) ── */
+    .counter-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; font-family: var(--mono); padding: 2px 7px;
+      border-radius: 3px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text-dim);
+      white-space: nowrap; margin-top: 3px;
+    }
+    .counter-badge .status-pip { width: 6px; height: 6px; flex-shrink: 0; }
+    .counter-badge.online { border-color: rgba(59,165,93,.35); color: var(--ok); background: rgba(59,165,93,.06); }
+    .counter-badge.stale  { border-color: rgba(232,164,24,.35); color: var(--warn); background: rgba(232,164,24,.06); }
+    .counter-badge.offline { border-color: rgba(212,64,64,.2); }
+    .counter-badges { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+
+    /* ── Device Sync Row ── */
+    .dev-sync-row {
+      display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px;
+      padding-top: 6px; border-top: 1px solid var(--border);
+    }
+    .dev-sync-row button {
+      flex: 1; min-width: 0; width: auto; padding: 4px 8px; font-size: 10px;
+      background: transparent; color: var(--text-dim); border: 1px solid var(--border);
+      font-weight: 600; white-space: nowrap;
+    }
+    .dev-sync-row button:hover { color: var(--accent); border-color: var(--accent); }
+    .dev-sync-row button.sync-all { color: var(--ok); border-color: rgba(59,165,93,.3); }
+    .dev-sync-row button.sync-all:hover { border-color: var(--ok); }
+
+    /* ── Device health badges ── */
+    .dev-health-badges {
+      display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px; font-family: var(--mono);
+    }
+    .dev-health-badge {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 2px 6px; border-radius: 3px;
+      border: 1px solid var(--border); color: var(--text-dim);
+      cursor: pointer; transition: border-color .15s, color .15s;
+    }
+    .dev-health-badge:hover { border-color: var(--info); color: var(--text); }
+    .dev-health-badge.batt-ok  { border-color: rgba(59,165,93,.4);  color: var(--ok); }
+    .dev-health-badge.batt-warn { border-color: rgba(232,164,24,.4); color: var(--warn); }
+    .dev-health-badge.batt-crit { border-color: rgba(212,64,64,.4);  color: var(--danger); }
+    .dev-health-badge.rssi-ok   { border-color: rgba(74,144,196,.4); color: var(--info); }
+    .dev-health-badge.rssi-warn { border-color: rgba(232,164,24,.4); color: var(--warn); }
+    .dev-health-badge.rssi-poor { border-color: rgba(212,64,64,.4);  color: var(--danger); }
+
+    /* ── Health modal ── */
+    #healthModal { display:none; position:fixed; inset:0; z-index:1100;
+      background:rgba(0,0,0,.7); align-items:center; justify-content:center; }
+    #healthModal.open { display:flex; }
+    .health-modal-box {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); width: 900px; max-width: 96vw;
+      max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .health-modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+    }
+    .health-modal-header h3 { font-size: 14px; font-weight: 600; }
+    .health-modal-controls {
+      display: flex; align-items: center; gap: 10px; padding: 10px 18px;
+      border-bottom: 1px solid var(--border); font-size: 12px;
+    }
+    .health-modal-controls select, .health-modal-controls button {
+      width: auto; padding: 5px 10px; font-size: 12px;
+    }
+    .health-charts { padding: 14px 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+    .health-chart { height: 160px; }
+
+    /* ── Device Assignment Section ── */
+    .device-assign-section { margin-top: 12px; }
+    .dev-assign-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 8px; margin-top: 10px;
+    }
+    .dev-assign-card {
+      display: flex; flex-direction: column; gap: 8px; padding: 12px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--panel-2);
+    }
+    .dev-assign-top {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .dev-assign-card .dev-name {
+      font-weight: 600; font-size: 13px; font-family: var(--mono);
+      white-space: nowrap;
+    }
+    .dev-assign-card .dev-current {
+      flex: 1; font-size: 12px; color: var(--text-dim);
+      text-align: right;
+    }
+    .dev-assign-card .dev-current .assigned-label {
+      padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+      display: inline-block;
+    }
+    .dev-assign-card .dev-current .assigned-label.comp {
+      background: rgba(74,144,196,.1); color: var(--info); border: 1px solid rgba(74,144,196,.2);
+    }
+    .dev-assign-card .dev-current .assigned-label.asm {
+      background: rgba(212,135,14,.1); color: var(--accent); border: 1px solid rgba(212,135,14,.2);
+    }
+    .dev-assign-card .dev-current .assigned-label.none {
+      background: var(--surface); color: var(--text-dim);
+    }
+    .dev-assign-bottom {
+      display: flex; gap: 8px; align-items: center;
+    }
+    .dev-assign-bottom select {
+      flex: 1; min-width: 0; font-size: 12px; padding: 6px 8px;
+    }
+    .dev-assign-bottom button {
+      width: auto; padding: 6px 14px; font-size: 11px; flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .status-pip {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .status-pip.online { background: var(--ok); box-shadow: 0 0 4px rgba(59,165,93,.4); }
+    .status-pip.stale { background: var(--warn); }
+    .status-pip.offline { background: var(--danger); }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.65); z-index: 100;
+      justify-content: center; align-items: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; width: 420px;
+      max-width: 95vw; max-height: 90vh; overflow-y: auto;
+    }
+    .modal h2 { font-size: 16px; margin-bottom: 14px; }
+    .modal .field { margin-bottom: 12px; }
+    .modal .field label { display: block; margin-bottom: 3px; }
+    .modal-actions {
+      display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;
+    }
+    .modal-actions button { width: auto; padding: 8px 18px; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 20px; right: 20px; z-index: 300;
+      padding: 10px 18px; border-radius: var(--radius); font-size: 13px; font-weight: 600;
+      opacity: 0; transition: opacity .3s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+    .toast.success { background: var(--ok); color: #fff; }
+    .toast.error { background: var(--danger); color: #fff; }
+
+    /* ── Inventory Overview Tab ── */
+    .inv-overview {
+      position: relative;
+    }
+    .inv-overview-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 12px;
+    }
+    .inv-overview-header strong {
+      font-size: 13px; text-transform: uppercase; letter-spacing: .5px;
+    }
+    .inv-overview-actions { display: flex; gap: 8px; align-items: center; }
+    .inv-overview-actions button { width: auto; padding: 6px 14px; font-size: 12px; }
+    .inv-overview-actions span { font-size: 12px; color: var(--text-dim); font-family: var(--mono); }
+
+    .inv-section-label {
+      font-size: 11px; text-transform: uppercase; letter-spacing: .8px;
+      color: var(--accent); font-weight: 700; margin: 16px 0 8px 4px;
+      padding-bottom: 4px; border-bottom: 1px solid var(--border);
+    }
+    .inv-section-label:first-child { margin-top: 0; }
+
+    .inv-card-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 8px;
+    }
+    .inv-item-card {
+      display: flex; flex-direction: column; padding: 12px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--panel-2); transition: border-color .15s;
+    }
+    .inv-item-card:hover { border-color: var(--accent); }
+    .inv-item-card .inv-item-name {
+      font-weight: 600; font-size: 13px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .inv-item-card .inv-item-code {
+      font-size: 11px; color: var(--text-dim); font-family: var(--mono);
+      margin-bottom: 6px;
+    }
+    .inv-item-card .inv-item-count {
+      font-family: var(--mono); font-size: 24px; font-weight: 800;
+      color: var(--accent); line-height: 1.1;
+    }
+    .inv-item-card .inv-item-count.zero { color: var(--danger); }
+    .inv-item-card .inv-item-count.low { color: var(--warn); }
+    .inv-item-card .inv-item-footer {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 6px; font-size: 10px; color: var(--text-dim);
+    }
+    .inv-item-card .inv-item-type {
+      padding: 1px 6px; border-radius: 3px; font-size: 9px;
+      font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+    }
+    .inv-item-type.comp-type { background: rgba(74,144,196,.12); color: var(--info); }
+    .inv-item-type.asm-type { background: rgba(212,135,14,.12); color: var(--accent); }
+    .inv-item-card .inv-can-build {
+      font-size: 11px; color: var(--ok); font-weight: 600;
+    }
+
+    /* Low-stock / out-of-stock card highlighting */
+    .inv-item-card.stock-out {
+      border-color: var(--danger);
+      background: rgba(212,64,64,.06);
+      box-shadow: inset 0 0 0 1px rgba(212,64,64,.15);
+    }
+    .inv-item-card.stock-low {
+      border-color: var(--warn);
+      background: rgba(232,164,24,.06);
+      box-shadow: inset 0 0 0 1px rgba(232,164,24,.12);
+    }
+    .inv-item-card .inv-stock-tag {
+      display: inline-block; padding: 1px 6px; border-radius: 3px;
+      font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+    }
+    .inv-stock-tag.out { background: rgba(212,64,64,.15); color: var(--danger); }
+    .inv-stock-tag.low { background: rgba(232,164,24,.15); color: var(--warn); }
+
+    /* Supplier URL link */
+    .inv-supplier-link {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 10px; color: var(--info); text-decoration: none;
+      max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .inv-supplier-link:hover { color: var(--accent); text-decoration: underline; }
+
+    /* Inventory toolbar (search + filters) */
+    .inv-toolbar {
+      display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;
+    }
+    .inv-toolbar input[type="text"] {
+      flex: 1; min-width: 180px; max-width: 340px;
+    }
+    .inv-toolbar select {
+      width: auto; min-width: 130px; font-size: 12px; padding: 7px 10px;
+    }
+    .inv-toolbar button { width: auto; padding: 7px 14px; font-size: 12px; white-space: nowrap; }
+
+    /* Fullscreen overlay for inventory overview */
+    .inv-fullscreen-overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: var(--bg); overflow-y: auto; padding: 16px 24px;
+    }
+    .inv-fullscreen-overlay.open { display: block; }
+    .inv-fullscreen-overlay .inv-fs-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border);
+    }
+    .inv-fullscreen-overlay .inv-fs-header .logo {
+      font-size: 18px; font-weight: 800; color: var(--accent); font-family: var(--mono);
+    }
+    .inv-fullscreen-overlay .inv-fs-header .logo span { color: var(--text); font-weight: 400; }
+    .inv-fullscreen-overlay .inv-card-grid {
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 10px;
+    }
+    .inv-fullscreen-overlay .inv-item-card {
+      padding: 14px;
+    }
+    .inv-fullscreen-overlay .inv-item-count {
+      font-size: 28px;
+    }
+
+    /* ── Reserved / Available display ── */
+    .inv-item-reserved {
+      font-size: 10px; color: var(--warn); font-family: var(--mono);
+      margin-top: 2px;
+    }
+    .inv-item-velocity {
+      font-size: 10px; color: var(--text-dim); font-family: var(--mono);
+      margin-top: 2px; display: flex; align-items: center; gap: 4px;
+    }
+    .inv-item-velocity.vel-critical { color: var(--danger); font-weight: 700; }
+    .inv-item-velocity.vel-warn { color: var(--warn); }
+    .reserved-inline {
+      font-size: 10px; color: var(--warn); font-family: var(--mono);
+      margin-left: 6px; white-space: nowrap;
+    }
+
+    /* ── QR Label Modal ── */
+    .qr-label-wrap { text-align: center; padding: 8px 0; }
+    .qr-label-code {
+      font-family: var(--mono); font-size: 22px; font-weight: 800;
+      color: var(--accent); margin-bottom: 4px; letter-spacing: 1px;
+    }
+    .qr-label-name { font-size: 14px; color: var(--text); margin-bottom: 4px; }
+    .qr-label-type {
+      font-size: 10px; text-transform: uppercase; letter-spacing: .8px;
+      color: var(--text-dim); margin-bottom: 14px;
+    }
+    #qrCodeDiv { margin: 0 auto 14px; display: inline-block; }
+    #qrCodeDiv img, #qrCodeDiv canvas { border-radius: 4px; }
+    .qr-print-hint { font-size: 11px; color: var(--text-dim); margin-top: 8px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 860px) {
+      .bom-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ─── Header ─── -->
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">STOCKNET <span>// BOM Manager</span></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <a href="/orders" class="nav-link">Orders</a>
+      <a href="/procurement" class="nav-link">Procurement</a>
+      <a href="/" class="nav-link">&larr; Dashboard</a>
+    </div>
+  </div>
+
+  <!-- ─── Tabs ─── -->
+  <div class="tabs">
+    <button class="active" data-tab="bom">Bill of Materials</button>
+    <button data-tab="devices">Counter Assignments</button>
+    <button data-tab="inventory">Inventory Overview</button>
+  </div>
+
+  <!-- ═══════ TAB: BOM ═══════ -->
+  <div id="tabBom">
+    <div class="bom-grid">
+
+      <!-- ─── Components Panel (left, draggable) ─── -->
+      <div class="panel">
+        <div class="panel-header">
+          <strong>Components</strong>
+          <span id="compCount" style="font-size:12px; color:var(--text-dim);">--</span>
+        </div>
+        <div class="search-row">
+          <input id="compSearch" type="text" placeholder="Search components..." />
+          <button id="newCompBtn">+ New</button>
+        </div>
+        <div class="comp-list" id="compList"></div>
+      </div>
+
+      <!-- ─── Assemblies Panel (right, drop zone) ─── -->
+      <div class="panel">
+        <div class="panel-header">
+          <strong>Assemblies</strong>
+          <span id="asmCount" style="font-size:12px; color:var(--text-dim);">--</span>
+        </div>
+        <div class="search-row">
+          <input id="asmSearch" type="text" placeholder="Search assemblies..." />
+          <button id="newAsmBtn">+ New</button>
+        </div>
+        <div class="asm-list" id="asmList"></div>
+        <div style="font-size:11px; color:var(--text-dim); text-align:center; margin-top:8px; padding:6px 0; border-top:1px solid var(--border);">
+          Drag components from the left panel and drop onto an assembly to add to its BOM
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ TAB: DEVICES ═══════ -->
+  <div id="tabDevices" style="display:none;">
+    <div class="panel device-assign-section">
+      <div class="panel-header">
+        <strong>Device &harr; Part Assignments</strong>
+        <span id="devCount" style="font-size:12px; color:var(--text-dim);">--</span>
+      </div>
+      <div style="font-size:12px; color:var(--text-dim); margin-bottom:10px;">
+        Assign each counter device to track a specific component or assembly.
+      </div>
+      <div class="dev-assign-grid" id="devAssignGrid"></div>
+    </div>
+  </div>
+
+  <!-- ═══════ TAB: INVENTORY OVERVIEW ═══════ -->
+  <div id="tabInventory" style="display:none;">
+    <div class="inv-overview panel">
+      <div class="inv-overview-header">
+        <strong>Inventory Overview</strong>
+        <div class="inv-overview-actions">
+          <span id="invSummary">--</span>
+          <button class="secondary" id="invExportBtn">&#8681; Export CSV</button>
+          <button class="secondary" id="invFullscreenBtn">&#x26F6; Fullscreen</button>
+        </div>
+      </div>
+      <div class="inv-toolbar">
+        <input type="text" id="invSearch" placeholder="Search parts..." />
+        <select id="invFilterType">
+          <option value="all">All Types</option>
+          <option value="component">Components</option>
+          <option value="assembly">Assemblies</option>
+        </select>
+        <select id="invFilterStock">
+          <option value="all">All Stock Levels</option>
+          <option value="out">Out of Stock</option>
+          <option value="low">Low Stock</option>
+          <option value="ok">In Stock</option>
+        </select>
+      </div>
+      <div id="invOverviewContent"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ─── Fullscreen Inventory Overlay ─── -->
+<div class="inv-fullscreen-overlay" id="invFullscreen">
+  <div class="inv-fs-header">
+    <div class="logo">STOCKNET <span>// Inventory Overview</span></div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span id="invFsSummary" style="font-size:12px;color:var(--text-dim);font-family:var(--mono);">--</span>
+      <button class="secondary" id="invFsExportBtn" style="width:auto;padding:6px 14px;font-size:12px;">&#8681; Export CSV</button>
+      <button class="secondary" id="invFullscreenClose" style="width:auto;padding:6px 14px;font-size:12px;">&#10005; Close</button>
+    </div>
+  </div>
+  <div class="inv-toolbar">
+    <input type="text" id="invFsSearch" placeholder="Search parts..." />
+    <select id="invFsFilterType">
+      <option value="all">All Types</option>
+      <option value="component">Components</option>
+      <option value="assembly">Assemblies</option>
+    </select>
+    <select id="invFsFilterStock">
+      <option value="all">All Stock Levels</option>
+      <option value="out">Out of Stock</option>
+      <option value="low">Low Stock</option>
+      <option value="ok">In Stock</option>
+    </select>
+  </div>
+  <div id="invFullscreenContent"></div>
+</div>
+
+<!-- ─── Create/Edit Component Modal ─── -->
+<div class="modal-overlay" id="compModal">
+  <div class="modal">
+    <h2 id="compModalTitle">New Component</h2>
+    <div class="field">
+      <label>Part ID (unique code)</label>
+      <input id="compPartId" type="text" placeholder="e.g. R-10K" />
+    </div>
+    <div class="field">
+      <label>Part Name</label>
+      <input id="compPartName" type="text" placeholder="e.g. Resistor 10kΩ" />
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <input id="compDesc" type="text" placeholder="Optional description" />
+    </div>
+    <div class="field">
+      <label>Min Threshold</label>
+      <input id="compThresh" type="number" min="0" value="0" />
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div class="field">
+        <label>Lead Time (days)</label>
+        <input id="compLeadTime" type="number" min="0" value="7" />
+      </div>
+      <div class="field">
+        <label>Min Order Qty</label>
+        <input id="compMinOrder" type="number" min="1" value="1" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Supplier URL (Digikey, Mouser, etc.)</label>
+      <input id="compSupplierUrl" type="url" placeholder="https://www.digikey.com/..." />
+    </div>
+    <input id="compEditId" type="hidden" />
+    <div class="modal-actions">
+      <button class="secondary" id="compModalCancel">Cancel</button>
+      <button id="compModalSave">Save Component</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Create/Edit Assembly Modal ─── -->
+<div class="modal-overlay" id="asmModal">
+  <div class="modal">
+    <h2 id="asmModalTitle">New Assembly</h2>
+    <div class="field">
+      <label>Assembly Code (unique)</label>
+      <input id="asmCode" type="text" placeholder="e.g. ASM-PSU5V" />
+    </div>
+    <div class="field">
+      <label>Assembly Name</label>
+      <input id="asmName" type="text" placeholder="e.g. 5V Power Supply Module" />
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <input id="asmDesc" type="text" placeholder="Optional description" />
+    </div>
+    <div class="field">
+      <label>Min Threshold</label>
+      <input id="asmThresh" type="number" min="0" value="0" />
+    </div>
+    <input id="asmEditId" type="hidden" />
+    <div class="modal-actions">
+      <button class="secondary" id="asmModalCancel">Cancel</button>
+      <button id="asmModalSave">Save Assembly</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Quantity Modal (on drop) ─── -->
+<div class="modal-overlay" id="qtyModal">
+  <div class="modal" style="width:340px;">
+    <h2>Add to BOM</h2>
+    <div style="margin-bottom:12px;">
+      <span style="color:var(--text-dim);">Component:</span>
+      <strong id="qtyCompName"></strong>
+    </div>
+    <div style="margin-bottom:6px;">
+      <span style="color:var(--text-dim);">Assembly:</span>
+      <strong id="qtyAsmName"></strong>
+    </div>
+    <div class="field" style="margin-top:14px;">
+      <label>Quantity Required (per assembly)</label>
+      <input id="qtyInput" type="number" min="0.0001" step="1" value="1" style="font-family:var(--mono);font-size:18px;text-align:center;" />
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" id="qtyModalCancel">Cancel</button>
+      <button class="ok-btn" id="qtyModalSave">Add to BOM</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── QR Label Modal ─── -->
+<div class="modal-overlay" id="qrModal">
+  <div class="modal" style="width:360px;">
+    <h2>Bin Label</h2>
+    <div class="qr-label-wrap">
+      <div class="qr-label-code" id="qrLabelCode"></div>
+      <div class="qr-label-name" id="qrLabelName"></div>
+      <div class="qr-label-type" id="qrLabelType"></div>
+      <div id="qrCodeDiv"></div>
+      <div class="qr-print-hint">Scan to identify · Use Ctrl+P to print label</div>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" id="qrModalPrint" style="width:auto;padding:8px 16px;">&#128438; Print</button>
+      <button class="secondary" id="qrModalClose" style="width:auto;padding:8px 16px;">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Cycle Count Schedule Modal ─── -->
+<div class="modal-overlay" id="cycleModal">
+  <div class="modal" style="width:380px;">
+    <h2>Schedule Cycle Count</h2>
+    <div style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">
+      Schedule a physical count for <strong id="cycleItemName"></strong>
+    </div>
+    <div class="field" style="margin-bottom:12px;">
+      <label>Scheduled Date</label>
+      <input id="cycleDate" type="date" />
+    </div>
+    <div class="field" style="margin-bottom:12px;">
+      <label>System Count (auto-filled at scheduling time)</label>
+      <input id="cycleSysCount" type="number" step="any" readonly
+        style="background:var(--bg);cursor:default;color:var(--text-dim);" />
+    </div>
+    <div class="field" style="margin-bottom:12px;">
+      <label>Notes (optional)</label>
+      <input id="cycleNotes" type="text" placeholder="Reason for count, location, etc." />
+    </div>
+    <input id="cycleItemId" type="hidden" />
+    <input id="cycleItemType" type="hidden" />
+    <div class="modal-actions">
+      <button class="secondary" id="cycleModalCancel">Cancel</button>
+      <button id="cycleModalSave">Schedule Count</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Health Metrics Modal ─── -->
+<div id="healthModal">
+  <div class="health-modal-box">
+    <div class="health-modal-header">
+      <h3 id="healthModalTitle">Counter Health: –</h3>
+      <button class="secondary" id="healthModalClose" style="width:auto;padding:6px 12px;">✕</button>
+    </div>
+    <div class="health-modal-controls">
+      <span style="color:var(--text-dim);">Time range:</span>
+      <select id="healthHours">
+        <option value="6">Last 6 h</option>
+        <option value="24" selected>Last 24 h</option>
+        <option value="72">Last 3 days</option>
+        <option value="168">Last 7 days</option>
+        <option value="720">Last 30 days</option>
+      </select>
+      <button id="healthRefreshBtn" class="secondary" style="width:auto;padding:5px 12px;">↻ Refresh</button>
+      <span id="healthReadingCount" style="color:var(--text-dim);margin-left:auto;"></span>
+    </div>
+    <div class="health-charts">
+      <div>
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.6px;">Battery %</div>
+        <div class="health-chart" id="chartBattery"></div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.6px;">RSSI (dBm)</div>
+        <div class="health-chart" id="chartRssi"></div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.6px;">Temperature (°C)</div>
+        <div class="health-chart" id="chartTemp"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Toast ─── -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════  STATE  ═══════════════════════════ */
+const S = {
+  components: [],
+  assemblies: [],
+  devices: [],
+  velocity: [],       // from /api/inventory/velocity
+  compSearch: '',
+  asmSearch: '',
+  activeTab: 'bom',
+  dropComponent: null,
+  dropAssembly: null,
+};
+
+/* ═══════════════════════  HELPERS  ═════════════════════════ */
+function $(id) { return document.getElementById(id); }
+function toast(msg, type) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = `toast show ${type}`;
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+function isOnline(iso) { return iso && (Date.now() - new Date(iso).getTime()) < 300000; }
+function isStale(iso) { return iso && !isOnline(iso) && (Date.now() - new Date(iso).getTime()) < 3600000; }
+function batteryHtml(voltage) {
+  if (voltage == null) return '';
+  const pct = Math.max(0, Math.min(100, ((voltage - 3.0) / (4.2 - 3.0)) * 100));
+  const cls = voltage <= 3.2 ? 'crit' : voltage <= 3.4 ? 'warn' : 'ok';
+  return `<div class="batt-row">` +
+    `<span class="batt-icon ${cls}"><span class="batt-fill" style="width:${pct}%"></span></span>` +
+    `<span class="batt-label ${cls}">${voltage.toFixed(2)}V</span></div>`;
+}
+function statusCls(iso) { return isOnline(iso) ? 'online' : isStale(iso) ? 'stale' : 'offline'; }
+
+// Returns HTML badge(s) for any counter(s) assigned to this component or assembly
+// Clicking a badge opens the health metrics modal for that device
+function counterBadgesHtml(entityId, type) {
+  const assigned = S.devices.filter(d =>
+    type === 'component'
+      ? (d.assignment_type === 'component' && d.assigned_component_id === entityId)
+      : (d.assignment_type === 'assembly'   && d.assigned_assembly_id  === entityId)
+  );
+  if (!assigned.length) return '';
+  const badges = assigned.map(d => {
+    const cls = statusCls(d.last_seen_at);
+    const esc = d.device_name.replace(/'/g, "\\'");
+    return `<span class="counter-badge ${cls}" style="cursor:pointer;" title="Click for health metrics"
+      onclick="openHealthModal('${esc}')"
+      ><span class="status-pip ${cls}"></span>${d.device_name}</span>`;
+  }).join('');
+  return `<div class="counter-badges">${badges}</div>`;
+}
+
+function rssiClass(rssi) {
+  if (rssi == null) return '';
+  if (rssi >= -60) return 'rssi-ok';
+  if (rssi >= -75) return 'rssi-warn';
+  return 'rssi-poor';
+}
+
+function healthBadgesHtml(d) {
+  const parts = [];
+  const esc = d.device_name.replace(/'/g, "\\'");
+  if (d.battery_voltage != null) {
+    const pct = Math.round(Math.max(0, Math.min(100, (d.battery_voltage - 3.0) / (4.2 - 3.0) * 100)));
+    const bc = d.battery_voltage <= 3.2 ? 'batt-crit' : d.battery_voltage <= 3.4 ? 'batt-warn' : 'batt-ok';
+    parts.push(`<span class="dev-health-badge ${bc}" onclick="openHealthModal('${esc}')" title="Battery">${d.battery_voltage} V</span>`);
+  }
+  if (d.rssi != null) {
+    const rc = rssiClass(d.rssi);
+    parts.push(`<span class="dev-health-badge ${rc}" onclick="openHealthModal('${esc}')" title="RSSI">${d.rssi} dBm</span>`);
+  }
+  if (d.temperature_c != null) {
+    parts.push(`<span class="dev-health-badge" onclick="openHealthModal('${esc}')" title="Die temperature">${d.temperature_c.toFixed(1)}&deg;C</span>`);
+  }
+  return parts.length ? `<div class="dev-health-badges">${parts.join('')}</div>` : '';
+}
+
+/* ═══════════════════════  FETCH  ═══════════════════════════ */
+async function fetchComponents() {
+  try {
+    const r = await fetch('/api/components'), d = await r.json();
+    S.components = d.components || [];
+    renderComponents();
+    if (S.activeTab === 'inventory') renderInventoryOverview();
+    if ($('invFullscreen').classList.contains('open')) renderInventoryFullscreen();
+  } catch (e) { console.error('fetchComponents:', e); }
+}
+async function fetchAssemblies() {
+  try {
+    const r = await fetch('/api/assemblies'), d = await r.json();
+    S.assemblies = d.assemblies || [];
+    renderAssemblies();
+    if (S.activeTab === 'inventory') renderInventoryOverview();
+    if ($('invFullscreen').classList.contains('open')) renderInventoryFullscreen();
+  } catch (e) { console.error('fetchAssemblies:', e); }
+}
+async function fetchDeviceAssignments() {
+  try {
+    const r = await fetch('/api/devices/assignments'), d = await r.json();
+    S.devices = d.devices || [];
+    if (S.activeTab === 'devices') renderDeviceAssignments();
+    // Always refresh BOM badges regardless of active tab
+    renderComponents();
+    renderAssemblies();
+  } catch (e) { console.error('fetchDeviceAssignments:', e); }
+}
+async function fetchVelocity() {
+  try {
+    const r = await fetch('/api/inventory/velocity'), d = await r.json();
+    S.velocity = d.items || [];
+    if (S.activeTab === 'inventory') renderInventoryOverview();
+    if ($('invFullscreen').classList.contains('open')) renderInventoryFullscreen();
+  } catch (e) { /* velocity is optional, silently ignore */ }
+}
+
+/* ═══════════════  COMPONENT LIST  ═════════════════════════ */
+function renderComponents() {
+  const el = $('compList');
+  let list = S.components;
+  if (S.compSearch) {
+    const q = S.compSearch;
+    list = list.filter(c =>
+      c.part_id.toLowerCase().includes(q) ||
+      c.part_name.toLowerCase().includes(q) ||
+      (c.description || '').toLowerCase().includes(q)
+    );
+  }
+  $('compCount').textContent = `${list.length} component${list.length !== 1 ? 's' : ''}`;
+  if (!list.length) {
+    el.innerHTML = '<div style="color:var(--text-dim);padding:16px 0;text-align:center;font-size:13px;">No components found.</div>';
+    return;
+  }
+  el.innerHTML = list.map(c => {
+    const cnt = c.current_count != null ? Number(c.current_count) : 0;
+    const reserved = c.reserved_count != null ? Number(c.reserved_count) : 0;
+    const available = Math.max(0, cnt - reserved);
+    const reservedHtml = reserved > 0
+      ? `<span class="reserved-inline">↗${reserved} rsv · ${available} avail</span>`
+      : '';
+    return `
+    <div class="comp-card" draggable="true" data-comp-id="${c.component_id}" data-comp-name="${c.part_name}" data-comp-pid="${c.part_id}">
+      <div class="comp-icon">${c.part_id.charAt(0)}</div>
+      <div class="comp-detail">
+        <div class="comp-name">${c.part_name}</div>
+        <div class="comp-pid">${c.part_id}</div>
+        ${counterBadgesHtml(c.component_id, 'component')}
+        <div class="stock-adjust-inline" onclick="event.stopPropagation()">
+          <button onclick="adjustStock('component','${c.component_id}',-parseInt(this.parentNode.querySelector('input').value)||0)">-</button>
+          <input type="number" min="1" value="1" onclick="this.select()" />
+          <button onclick="adjustStock('component','${c.component_id}',parseInt(this.parentNode.querySelector('input').value)||0)">+</button>
+          <span class="stock-badge ${cnt === 0 ? 'zero' : ''}">${cnt.toLocaleString()}</span>
+          ${reservedHtml}
+        </div>
+      </div>
+      <div class="comp-actions">
+        <button onclick="event.stopPropagation();openQrLabel('component','${c.component_id}','${c.part_id.replace(/'/g,"\\'")}','${c.part_name.replace(/'/g,"\\'")}')">QR</button>
+        <button onclick="event.stopPropagation();openCycleCountSchedule('component','${c.component_id}','${c.part_name.replace(/'/g,"\\'")}',${cnt})">Count</button>
+        <button onclick="event.stopPropagation();openEditComp('${c.component_id}')">Edit</button>
+        <button onclick="event.stopPropagation();deleteComp('${c.component_id}','${c.part_name}')">Del</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Drag handlers
+  el.querySelectorAll('.comp-card').forEach(card => {
+    card.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('application/x-comp-id', card.dataset.compId);
+      e.dataTransfer.setData('application/x-comp-name', card.dataset.compName);
+      e.dataTransfer.setData('application/x-comp-pid', card.dataset.compPid);
+      e.dataTransfer.effectAllowed = 'copy';
+      card.classList.add('dragging');
+    });
+    card.addEventListener('dragend', () => card.classList.remove('dragging'));
+  });
+}
+
+/* ═══════════════  ASSEMBLY LIST  ══════════════════════════ */
+function renderAssemblies() {
+  const el = $('asmList');
+  let list = S.assemblies;
+  if (S.asmSearch) {
+    const q = S.asmSearch;
+    list = list.filter(a =>
+      a.assembly_code.toLowerCase().includes(q) ||
+      a.assembly_name.toLowerCase().includes(q)
+    );
+  }
+  $('asmCount').textContent = `${list.length} assembl${list.length !== 1 ? 'ies' : 'y'}`;
+  if (!list.length) {
+    el.innerHTML = '<div style="color:var(--text-dim);padding:16px 0;text-align:center;font-size:13px;">No assemblies found.</div>';
+    return;
+  }
+  el.innerHTML = list.map(a => {
+    const bomCount = (a.components || []).length;
+    const asmCnt = a.current_count != null ? Number(a.current_count) : 0;
+    // Calculate how many assemblies we could build from current component stock
+    let canBuild = bomCount > 0 ? Infinity : 0;
+    for (const b of (a.components || [])) {
+      if (b.quantity_required > 0) {
+        canBuild = Math.min(canBuild, Math.floor((b.comp_stock || 0) / b.quantity_required));
+      }
+    }
+    if (!isFinite(canBuild)) canBuild = 0;
+
+    const bomHtml = bomCount === 0
+      ? '<div class="bom-empty">No components — drop one here to start the BOM</div>'
+      : a.components.map(b => {
+        const cs = Number(b.comp_stock || 0);
+        return `
+        <div class="bom-row">
+          <span class="bom-pid">${b.part_id}</span>
+          <span class="bom-name">${b.part_name}</span>
+          <span class="bom-x">&times;</span>
+          <span class="bom-qty">${Number(b.quantity_required)}</span>
+          <span class="stock-badge ${cs === 0 ? 'zero' : ''}" style="font-size:11px;margin-left:6px;" title="Component stock">${cs.toLocaleString()} in stock</span>
+          <span class="bom-actions">
+            <button title="Edit quantity" onclick="editBomQty('${a.assembly_id}','${b.component_id}','${b.part_name}',${b.quantity_required})">&#9998;</button>
+            <button title="Remove" onclick="removeBom('${a.assembly_id}','${b.component_id}','${b.part_name}')">&#10005;</button>
+          </span>
+        </div>`;
+      }).join('');
+
+    return `
+      <div class="asm-card" data-asm-id="${a.assembly_id}">
+        <div class="asm-card-header">
+          <div class="asm-icon">&#9881;</div>
+          <div class="asm-detail">
+            <div class="asm-name">${a.assembly_name}</div>
+            <div class="asm-code">${a.assembly_code}</div>
+          </div>
+          <span class="asm-count">${bomCount} part${bomCount !== 1 ? 's' : ''}</span>
+          <div class="asm-actions">
+            <button onclick="event.stopPropagation();openEditAsm('${a.assembly_id}')">Edit</button>
+            <button onclick="event.stopPropagation();deleteAsm('${a.assembly_id}','${a.assembly_name}')">Del</button>
+          </div>
+        </div>
+        <div class="asm-stock-row">
+          <span style="font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.5px;">Stock:</span>
+          <span class="stock-badge ${asmCnt === 0 ? 'zero' : ''}" style="font-size:16px;">${asmCnt.toLocaleString()}</span>
+          <div class="stock-adjust-inline">
+            <button onclick="adjustStock('assembly','${a.assembly_id}',-parseInt(this.parentNode.querySelector('input').value)||0)">-</button>
+            <input type="number" min="1" value="1" onclick="this.select()" />
+            <button onclick="adjustStock('assembly','${a.assembly_id}',parseInt(this.parentNode.querySelector('input').value)||0)">+</button>
+          </div>
+          ${(() => { const rsv = a.reserved_count != null ? Number(a.reserved_count) : 0; return rsv > 0 ? `<span class="reserved-inline">↗${rsv} rsv · ${Math.max(0,asmCnt-rsv)} avail</span>` : ''; })()}
+          <span class="asm-stock-info">${bomCount > 0 ? `Can build: <strong style="color:${canBuild > 0 ? 'var(--ok)' : 'var(--danger)'}">${canBuild}</strong> from stock` : ''}</span>
+          ${counterBadgesHtml(a.assembly_id, 'assembly')}
+          <div style="margin-left:auto;display:flex;gap:4px;">
+            <button style="width:auto;padding:3px 8px;font-size:10px;background:transparent;color:var(--text-dim);border:1px solid var(--border);" onclick="event.stopPropagation();openQrLabel('assembly','${a.assembly_id}','${a.assembly_code.replace(/'/g,"\\'")}','${a.assembly_name.replace(/'/g,"\\'")}')">QR</button>
+            <button style="width:auto;padding:3px 8px;font-size:10px;background:transparent;color:var(--text-dim);border:1px solid var(--border);" onclick="event.stopPropagation();openCycleCountSchedule('assembly','${a.assembly_id}','${a.assembly_name.replace(/'/g,"\\'")}',${asmCnt})">Count</button>
+          </div>
+        </div>
+        <div class="asm-bom" data-asm-id="${a.assembly_id}" data-asm-name="${a.assembly_name}">
+          ${bomHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Drop zone handlers on each .asm-bom
+  el.querySelectorAll('.asm-bom').forEach(zone => {
+    zone.addEventListener('dragover', e => {
+      if (!e.dataTransfer.types.includes('application/x-comp-id')) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      zone.classList.add('drop-over');
+    });
+    zone.addEventListener('dragleave', e => {
+      if (e.relatedTarget && zone.contains(e.relatedTarget)) return;
+      zone.classList.remove('drop-over');
+    });
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('drop-over');
+      const compId = e.dataTransfer.getData('application/x-comp-id');
+      const compName = e.dataTransfer.getData('application/x-comp-name');
+      const asmId = zone.dataset.asmId;
+      const asmName = zone.dataset.asmName;
+      if (!compId || !asmId) return;
+      openQtyModal(compId, compName, asmId, asmName);
+    });
+  });
+
+  // Global drag visual: highlight all drop zones when dragging
+  document.addEventListener('dragover', () => {
+    el.querySelectorAll('.asm-bom').forEach(z => z.classList.add('drop-active'));
+  });
+  document.addEventListener('dragend', () => {
+    el.querySelectorAll('.asm-bom').forEach(z => z.classList.remove('drop-active', 'drop-over'));
+  });
+}
+
+/* ═══════════════  QUANTITY MODAL (drag-drop)  ═════════════ */
+function openQtyModal(compId, compName, asmId, asmName) {
+  S.dropComponent = compId;
+  S.dropAssembly = asmId;
+  $('qtyCompName').textContent = compName;
+  $('qtyAsmName').textContent = asmName;
+  // Check if this component is already in the assembly BOM
+  const asm = S.assemblies.find(a => a.assembly_id === asmId);
+  const existing = asm && asm.components.find(b => b.component_id === compId);
+  $('qtyInput').value = existing ? existing.quantity_required : 1;
+  $('qtyModal').classList.add('open');
+  $('qtyInput').focus();
+  $('qtyInput').select();
+}
+
+$('qtyModalCancel').addEventListener('click', () => {
+  $('qtyModal').classList.remove('open');
+  S.dropComponent = null; S.dropAssembly = null;
+});
+$('qtyModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) {
+    $('qtyModal').classList.remove('open');
+    S.dropComponent = null; S.dropAssembly = null;
+  }
+});
+
+$('qtyModalSave').addEventListener('click', async () => {
+  const qty = parseFloat($('qtyInput').value);
+  if (!qty || qty <= 0) { toast('Enter a valid quantity', 'error'); return; }
+  try {
+    const r = await fetch(`/api/assemblies/${S.dropAssembly}/components`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ component_id: S.dropComponent, quantity_required: qty }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      toast('BOM updated', 'success');
+      $('qtyModal').classList.remove('open');
+      S.dropComponent = null; S.dropAssembly = null;
+      await fetchAssemblies();
+    } else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Network error', 'error'); }
+});
+
+/* ═══════════════  BOM INLINE ACTIONS  ═════════════════════ */
+async function editBomQty(asmId, compId, compName, currentQty) {
+  const newQty = prompt(`Quantity of "${compName}" per assembly:`, currentQty);
+  if (newQty === null) return;
+  const val = parseFloat(newQty);
+  if (!val || val <= 0) { toast('Invalid quantity', 'error'); return; }
+  try {
+    const r = await fetch(`/api/assemblies/${asmId}/components/${compId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ quantity_required: val }),
+    });
+    const d = await r.json();
+    if (d.ok) { toast('Quantity updated', 'success'); await fetchAssemblies(); }
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Network error', 'error'); }
+}
+
+async function removeBom(asmId, compId, compName) {
+  if (!confirm(`Remove "${compName}" from this assembly?`)) return;
+  try {
+    const r = await fetch(`/api/assemblies/${asmId}/components/${compId}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (d.ok) { toast('Removed from BOM', 'success'); await fetchAssemblies(); }
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Network error', 'error'); }
+}
+
+/* ═══════════════  STOCK ADJUSTMENT  ══════════════════════ */
+async function adjustStock(itemType, itemId, delta) {
+  if (!delta) return;
+  try {
+    const r = await fetch('/api/inventory/adjust', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item_type: itemType, item_id: itemId, delta }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      let msg = `${itemType === 'assembly' ? 'Assembly' : 'Component'} stock ${delta > 0 ? '+' : ''}${delta}`;
+      if (d.deductions && d.deductions.length > 0) {
+        msg += ' — BOM deducted: ' + d.deductions.map(x => `${x.part_id} ×${x.deducted}`).join(', ');
+      }
+      if (d.commands_enqueued && d.commands_enqueued.length > 0) {
+        msg += ` · ${d.commands_enqueued.length} counter(s) synced`;
+      }
+      toast(msg, 'success');
+      await Promise.all([fetchComponents(), fetchAssemblies()]);
+    } else {
+      toast(d.error || 'Adjustment failed', 'error');
+    }
+  } catch (e) { toast('Network error', 'error'); }
+}
+
+/* ═══════════════  COMPONENT CRUD  ═════════════════════════ */
+function openNewComp() {
+  $('compModalTitle').textContent = 'New Component';
+  $('compPartId').value = ''; $('compPartName').value = '';
+  $('compDesc').value = ''; $('compThresh').value = '0';
+  $('compLeadTime').value = '7'; $('compMinOrder').value = '1';
+  $('compSupplierUrl').value = '';
+  $('compEditId').value = '';
+  $('compPartId').disabled = false;
+  $('compModal').classList.add('open');
+  $('compPartId').focus();
+}
+
+function openEditComp(id) {
+  const c = S.components.find(x => x.component_id === id);
+  if (!c) return;
+  $('compModalTitle').textContent = 'Edit Component';
+  $('compPartId').value = c.part_id; $('compPartId').disabled = true;
+  $('compPartName').value = c.part_name;
+  $('compDesc').value = c.description || '';
+  $('compThresh').value = c.min_threshold || 0;
+  $('compLeadTime').value = c.lead_time_days != null ? c.lead_time_days : 7;
+  $('compMinOrder').value = c.min_order_qty != null ? c.min_order_qty : 1;
+  $('compSupplierUrl').value = c.supplier_url || '';
+  $('compEditId').value = id;
+  $('compModal').classList.add('open');
+  $('compPartName').focus();
+}
+
+$('newCompBtn').addEventListener('click', openNewComp);
+$('compModalCancel').addEventListener('click', () => $('compModal').classList.remove('open'));
+$('compModal').addEventListener('click', e => { if (e.target === e.currentTarget) $('compModal').classList.remove('open'); });
+
+$('compModalSave').addEventListener('click', async () => {
+  const editId = $('compEditId').value;
+  const pid = $('compPartId').value.trim();
+  const pname = $('compPartName').value.trim();
+  if (!pid || !pname) { toast('Part ID and Name are required', 'error'); return; }
+
+  try {
+    if (editId) {
+      const r = await fetch(`/api/components/${editId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          part_name: pname, description: $('compDesc').value.trim(),
+          min_threshold: parseInt($('compThresh').value) || 0,
+          lead_time_days: parseInt($('compLeadTime').value) || 7,
+          min_order_qty: parseInt($('compMinOrder').value) || 1,
+          supplier_url: $('compSupplierUrl').value.trim()
+        }),
+      });
+      const d = await r.json();
+      if (d.ok) { toast('Component updated', 'success'); $('compModal').classList.remove('open'); await fetchComponents(); }
+      else toast(d.error || 'Failed', 'error');
+    } else {
+      const r = await fetch('/api/components', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          part_id: pid, part_name: pname, description: $('compDesc').value.trim(),
+          min_threshold: parseInt($('compThresh').value) || 0,
+          lead_time_days: parseInt($('compLeadTime').value) || 7,
+          min_order_qty: parseInt($('compMinOrder').value) || 1,
+          supplier_url: $('compSupplierUrl').value.trim()
+        }),
+      });
+      const d = await r.json();
+      if (d.ok) { toast('Component created', 'success'); $('compModal').classList.remove('open'); await fetchComponents(); }
+      else toast(d.error || 'Failed', 'error');
+    }
+  } catch (e) { toast('Network error', 'error'); }
+});
+
+async function deleteComp(id, name) {
+  if (!confirm(`Deactivate component "${name}"? It will be removed from view.`)) return;
+  try {
+    const r = await fetch(`/api/components/${id}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (d.ok) { toast('Component deactivated', 'success'); await Promise.all([fetchComponents(), fetchAssemblies()]); }
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Network error', 'error'); }
+}
+
+/* ═══════════════  ASSEMBLY CRUD  ══════════════════════════ */
+function openNewAsm() {
+  $('asmModalTitle').textContent = 'New Assembly';
+  $('asmCode').value = ''; $('asmName').value = '';
+  $('asmDesc').value = ''; $('asmThresh').value = '0';
+  $('asmEditId').value = '';
+  $('asmCode').disabled = false;
+  $('asmModal').classList.add('open');
+  $('asmCode').focus();
+}
+
+function openEditAsm(id) {
+  const a = S.assemblies.find(x => x.assembly_id === id);
+  if (!a) return;
+  $('asmModalTitle').textContent = 'Edit Assembly';
+  $('asmCode').value = a.assembly_code; $('asmCode').disabled = true;
+  $('asmName').value = a.assembly_name;
+  $('asmDesc').value = a.description || '';
+  $('asmThresh').value = a.min_threshold || 0;
+  $('asmEditId').value = id;
+  $('asmModal').classList.add('open');
+  $('asmName').focus();
+}
+
+$('newAsmBtn').addEventListener('click', openNewAsm);
+$('asmModalCancel').addEventListener('click', () => $('asmModal').classList.remove('open'));
+$('asmModal').addEventListener('click', e => { if (e.target === e.currentTarget) $('asmModal').classList.remove('open'); });
+
+$('asmModalSave').addEventListener('click', async () => {
+  const editId = $('asmEditId').value;
+  const code = $('asmCode').value.trim();
+  const name = $('asmName').value.trim();
+  if (!code || !name) { toast('Code and Name are required', 'error'); return; }
+
+  try {
+    if (editId) {
+      const r = await fetch(`/api/assemblies/${editId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assembly_name: name, description: $('asmDesc').value.trim(), min_threshold: parseInt($('asmThresh').value) || 0 }),
+      });
+      const d = await r.json();
+      if (d.ok) { toast('Assembly updated', 'success'); $('asmModal').classList.remove('open'); await fetchAssemblies(); }
+      else toast(d.error || 'Failed', 'error');
+    } else {
+      const r = await fetch('/api/assemblies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assembly_code: code, assembly_name: name, description: $('asmDesc').value.trim(), min_threshold: parseInt($('asmThresh').value) || 0 }),
+      });
+      const d = await r.json();
+      if (d.ok) { toast('Assembly created', 'success'); $('asmModal').classList.remove('open'); await fetchAssemblies(); }
+      else toast(d.error || 'Failed', 'error');
+    }
+  } catch (e) { toast('Network error', 'error'); }
+});
+
+async function deleteAsm(id, name) {
+  if (!confirm(`Deactivate assembly "${name}"?`)) return;
+  try {
+    const r = await fetch(`/api/assemblies/${id}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (d.ok) { toast('Assembly deactivated', 'success'); await fetchAssemblies(); }
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Network error', 'error'); }
+}
+
+/* ═══════════════  DEVICE ASSIGNMENTS  ═════════════════════ */
+function renderDeviceAssignments() {
+  const el = $('devAssignGrid');
+  $('devCount').textContent = `${S.devices.length} device${S.devices.length !== 1 ? 's' : ''}`;
+  if (!S.devices.length) {
+    el.innerHTML = '<div style="color:var(--text-dim);padding:16px 0;text-align:center;font-size:13px;grid-column:1/-1;">No devices registered.</div>';
+    return;
+  }
+
+  // Build option groups
+  const compOpts = S.components.map(c => `<option value="comp:${c.component_id}">${c.part_id} — ${c.part_name}</option>`).join('');
+  const asmOpts = S.assemblies.map(a => `<option value="asm:${a.assembly_id}">${a.assembly_code} — ${a.assembly_name}</option>`).join('');
+
+  el.innerHTML = S.devices.map(d => {
+    let label = '';
+    let currentVal = '';
+    if (d.assignment_type === 'component' && d.part_id) {
+      label = `<span class="assigned-label comp">${d.part_id}: ${d.component_name}</span>`;
+      currentVal = `comp:${d.assigned_component_id}`;
+    } else if (d.assignment_type === 'assembly' && d.assembly_code) {
+      label = `<span class="assigned-label asm">${d.assembly_code}: ${d.assembly_name}</span>`;
+      currentVal = `asm:${d.assigned_assembly_id}`;
+    } else {
+      label = '<span class="assigned-label none">Unassigned</span>';
+    }
+
+    const isAssigned = d.assignment_type === 'component' || d.assignment_type === 'assembly';
+    const syncRow = isAssigned ? `
+      <div class="dev-sync-row">
+        <button class="sync-btn" data-device="${d.device_name}" data-sync="count">&#8635; Count</button>
+        <button class="sync-btn" data-device="${d.device_name}" data-sync="name">&#8635; Name/ID</button>
+        <button class="sync-btn" data-device="${d.device_name}" data-sync="thresholds">&#8635; Thresholds</button>
+        <button class="sync-btn sync-all" data-device="${d.device_name}" data-sync="all">&#8635; All</button>
+      </div>` : '';
+
+    const hBadges = healthBadgesHtml(d);
+    return `
+      <div class="dev-assign-card">
+        <div class="dev-assign-top">
+          <div class="status-pip ${statusCls(d.last_seen_at)}"></div>
+          <div class="dev-name">${d.device_name}</div>
+          <div class="dev-current">${label}</div>
+        </div>
+        ${hBadges}
+        <div class="dev-assign-bottom">
+          <select data-device="${d.device_name}" class="assign-select">
+            <option value="">-- Unassigned --</option>
+            <optgroup label="Components">${compOpts}</optgroup>
+            <optgroup label="Assemblies">${asmOpts}</optgroup>
+          </select>
+          <button class="secondary assign-btn" data-device="${d.device_name}">Apply</button>
+        </div>
+        ${syncRow}
+      </div>
+    `;
+  }).join('');
+
+  // Set current values
+  el.querySelectorAll('.assign-select').forEach(sel => {
+    const d = S.devices.find(x => x.device_name === sel.dataset.device);
+    if (!d) return;
+    if (d.assignment_type === 'component' && d.assigned_component_id) {
+      sel.value = `comp:${d.assigned_component_id}`;
+    } else if (d.assignment_type === 'assembly' && d.assigned_assembly_id) {
+      sel.value = `asm:${d.assigned_assembly_id}`;
+    } else {
+      sel.value = '';
+    }
+  });
+
+  // Assign buttons
+  el.querySelectorAll('.assign-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const deviceName = btn.dataset.device;
+      const sel = el.querySelector(`.assign-select[data-device="${deviceName}"]`);
+      const val = sel.value;
+
+      try {
+        if (!val) {
+          const r = await fetch('/api/devices/unassign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device_name: deviceName }),
+          });
+          const d = await r.json();
+          if (d.ok) { toast(`${deviceName} unassigned`, 'success'); await fetchDeviceAssignments(); }
+          else toast(d.error || 'Failed', 'error');
+        } else {
+          const [type, id] = val.split(':');
+          const body = { device_name: deviceName };
+          if (type === 'comp') {
+            body.assignment_type = 'component';
+            body.component_id = id;
+          } else {
+            body.assignment_type = 'assembly';
+            body.assembly_id = id;
+          }
+          const r = await fetch('/api/devices/assign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          const d = await r.json();
+          if (d.ok) {
+            const cmds = d.commands_enqueued || [];
+            toast(`${deviceName} assigned · ${cmds.length} cmd${cmds.length !== 1 ? 's' : ''} queued: ${cmds.join(', ')}`, 'success');
+            await fetchDeviceAssignments();
+          } else toast(d.error || 'Failed', 'error');
+        }
+      } catch (e) { toast('Network error', 'error'); }
+    });
+  });
+
+  // Sync buttons — push individual or all values to the counter on demand
+  el.querySelectorAll('.sync-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const deviceName = btn.dataset.device;
+      const syncType   = btn.dataset.sync;
+      const body = syncType === 'all'
+        ? { count: true, name: true, thresholds: true }
+        : { [syncType]: true };
+
+      const origText = btn.textContent;
+      btn.textContent = '…';
+      btn.disabled = true;
+
+      try {
+        const r = await fetch(`/api/devices/${encodeURIComponent(deviceName)}/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const d = await r.json();
+        if (d.ok) {
+          toast(`${deviceName} → queued: ${(d.commands_enqueued || []).join(', ')}`, 'success');
+        } else {
+          toast(d.error || 'Sync failed', 'error');
+        }
+      } catch (e) {
+        toast('Network error', 'error');
+      } finally {
+        btn.textContent = origText;
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
+/* ═══════════════  INVENTORY OVERVIEW  ═════════════════════ */
+function getStockStatus(cnt, thresh) {
+  if (cnt === 0) return 'out';
+  if (thresh && cnt <= thresh) return 'low';
+  return 'ok';
+}
+
+function buildInventoryCards(targetId, searchVal, filterType, filterStock) {
+  const q = (searchVal || '').trim().toLowerCase();
+  let comps = (S.components || []).slice();
+  let asms = (S.assemblies || []).slice();
+
+  // Search filter
+  if (q) {
+    comps = comps.filter(c =>
+      c.part_id.toLowerCase().includes(q) ||
+      c.part_name.toLowerCase().includes(q) ||
+      (c.description || '').toLowerCase().includes(q)
+    );
+    asms = asms.filter(a =>
+      a.assembly_code.toLowerCase().includes(q) ||
+      a.assembly_name.toLowerCase().includes(q) ||
+      (a.description || '').toLowerCase().includes(q)
+    );
+  }
+
+  // Type filter
+  if (filterType === 'component') asms = [];
+  else if (filterType === 'assembly') comps = [];
+
+  // Stock filter
+  if (filterStock && filterStock !== 'all') {
+    comps = comps.filter(c => {
+      const cnt = c.current_count != null ? Number(c.current_count) : 0;
+      return getStockStatus(cnt, c.min_threshold) === filterStock;
+    });
+    asms = asms.filter(a => {
+      const cnt = a.current_count != null ? Number(a.current_count) : 0;
+      return getStockStatus(cnt, a.min_threshold) === filterStock;
+    });
+  }
+
+  const totalItems = comps.length + asms.length;
+  let lowCount = 0, outCount = 0;
+
+  function cardHtml(name, code, count, type, extra) {
+    const cnt = count != null ? Number(count) : 0;
+    const status = getStockStatus(cnt, extra.thresh);
+    const countCls = status === 'out' ? 'zero' : status === 'low' ? 'low' : '';
+    const cardCls = status === 'out' ? 'stock-out' : status === 'low' ? 'stock-low' : '';
+    if (status === 'out') outCount++;
+    if (status === 'low') lowCount++;
+    const tagHtml = status === 'out'
+      ? '<span class="inv-stock-tag out">Out of Stock</span>'
+      : status === 'low'
+        ? '<span class="inv-stock-tag low">Low Stock</span>'
+        : '';
+    const supplierHtml = extra.supplierUrl
+      ? `<a class="inv-supplier-link" href="${extra.supplierUrl}" target="_blank" rel="noopener" title="${extra.supplierUrl}">&#128279; Supplier</a>`
+      : '';
+
+    // Reserved / available
+    const reserved = extra.reserved != null ? Number(extra.reserved) : 0;
+    const available = Math.max(0, cnt - reserved);
+    const reservedHtml = reserved > 0
+      ? `<div class="inv-item-reserved">↗ ${reserved} reserved · ${available} available</div>`
+      : '';
+
+    // Velocity
+    let velocityHtml = '';
+    if (extra.velItem) {
+      const v = extra.velItem;
+      const rate = Number(v.daily_rate || 0);
+      const days = v.days_remaining != null ? Number(v.days_remaining) : null;
+      if (rate > 0) {
+        const velCls = days != null && days < 7 ? 'vel-critical' : days != null && days < 14 ? 'vel-warn' : '';
+        const daysText = days != null
+          ? (days > 999 ? '999+ days' : `${Math.round(days)} days left`)
+          : '—';
+        velocityHtml = `<div class="inv-item-velocity ${velCls}">&#9654; ${rate.toFixed(1)}/day · ${daysText}</div>`;
+      }
+    }
+
+    const qrBtn = `<button onclick="event.stopPropagation();openQrLabel('${type}','${extra.id}','${code.replace(/'/g,"\\'")}','${name.replace(/'/g,"\\'")}')"`
+      + ` style="width:auto;padding:1px 7px;font-size:10px;background:transparent;color:var(--text-dim);border:1px solid var(--border);margin-top:6px;">QR Label</button>`;
+
+    const ctrBadges = counterBadgesHtml(extra.id, type);
+
+    return `
+      <div class="inv-item-card ${cardCls}">
+        <div class="inv-item-name" title="${name}">${name}</div>
+        <div class="inv-item-code">${code}</div>
+        <div class="inv-item-count ${countCls}">${cnt.toLocaleString()}</div>
+        ${reservedHtml}
+        ${velocityHtml}
+        ${ctrBadges}
+        <div class="inv-item-footer">
+          <span class="inv-item-type ${type === 'component' ? 'comp-type' : 'asm-type'}">${type}</span>
+          ${tagHtml}
+          ${extra.canBuild != null ? `<span class="inv-can-build">Can build: ${extra.canBuild}</span>` : ''}
+          ${extra.thresh ? `<span>min: ${extra.thresh}</span>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;">
+          ${supplierHtml}
+          ${qrBtn}
+        </div>
+      </div>`;
+  }
+
+  let html = '';
+
+  // Assemblies section
+  if (asms.length > 0) {
+    html += '<div class="inv-section-label">Assemblies (' + asms.length + ')</div>';
+    html += '<div class="inv-card-grid">';
+    for (const a of asms) {
+      const asmCnt = a.current_count != null ? Number(a.current_count) : 0;
+      const bomCount = (a.components || []).length;
+      let canBuild = bomCount > 0 ? Infinity : 0;
+      for (const b of (a.components || [])) {
+        if (b.quantity_required > 0) {
+          canBuild = Math.min(canBuild, Math.floor((b.comp_stock || 0) / b.quantity_required));
+        }
+      }
+      if (!isFinite(canBuild)) canBuild = 0;
+      html += cardHtml(a.assembly_name, a.assembly_code, asmCnt, 'assembly', {
+        canBuild, thresh: a.min_threshold,
+        reserved: a.reserved_count,
+        id: a.assembly_id,
+      });
+    }
+    html += '</div>';
+  }
+
+  // Components section
+  if (comps.length > 0) {
+    html += '<div class="inv-section-label">Components (' + comps.length + ')</div>';
+    html += '<div class="inv-card-grid">';
+    for (const c of comps) {
+      const cnt = c.current_count != null ? Number(c.current_count) : 0;
+      const velItem = S.velocity.find(v => v.component_id === c.component_id);
+      html += cardHtml(c.part_name, c.part_id, cnt, 'component', {
+        thresh: c.min_threshold, supplierUrl: c.supplier_url,
+        reserved: c.reserved_count, velItem,
+        id: c.component_id,
+      });
+    }
+    html += '</div>';
+  }
+
+  if (!totalItems) {
+    html = '<div style="color:var(--text-dim);text-align:center;padding:40px 0;">No items match your filters.</div>';
+  }
+
+  $(targetId).innerHTML = html;
+  return { total: totalItems, low: lowCount, out: outCount };
+}
+
+function invSummaryText(stats) {
+  const comps = (S.components || []).length;
+  const asms = (S.assemblies || []).length;
+  let txt = `${asms} assemblies · ${comps} components`;
+  if (stats.out > 0 || stats.low > 0) {
+    const parts = [];
+    if (stats.out > 0) parts.push(`${stats.out} out`);
+    if (stats.low > 0) parts.push(`${stats.low} low`);
+    txt += ` · ${parts.join(', ')}`;
+  }
+  return txt;
+}
+
+function renderInventoryOverview() {
+  const stats = buildInventoryCards('invOverviewContent',
+    $('invSearch').value, $('invFilterType').value, $('invFilterStock').value);
+  $('invSummary').textContent = invSummaryText(stats);
+}
+
+function renderInventoryFullscreen() {
+  const stats = buildInventoryCards('invFullscreenContent',
+    $('invFsSearch').value, $('invFsFilterType').value, $('invFsFilterStock').value);
+  $('invFsSummary').textContent = invSummaryText(stats);
+}
+
+// Inventory toolbar event listeners (inline + fullscreen)
+let invSearchTO = null;
+$('invSearch').addEventListener('input', () => { clearTimeout(invSearchTO); invSearchTO = setTimeout(renderInventoryOverview, 200); });
+$('invFilterType').addEventListener('change', renderInventoryOverview);
+$('invFilterStock').addEventListener('change', renderInventoryOverview);
+
+let invFsSearchTO = null;
+$('invFsSearch').addEventListener('input', () => { clearTimeout(invFsSearchTO); invFsSearchTO = setTimeout(renderInventoryFullscreen, 200); });
+$('invFsFilterType').addEventListener('change', renderInventoryFullscreen);
+$('invFsFilterStock').addEventListener('change', renderInventoryFullscreen);
+
+// Export buttons
+function downloadExport() { window.open('/api/inventory/export', '_blank'); }
+$('invExportBtn').addEventListener('click', downloadExport);
+$('invFsExportBtn').addEventListener('click', downloadExport);
+
+$('invFullscreenBtn').addEventListener('click', () => {
+  // Sync filters to fullscreen
+  $('invFsSearch').value = $('invSearch').value;
+  $('invFsFilterType').value = $('invFilterType').value;
+  $('invFsFilterStock').value = $('invFilterStock').value;
+  renderInventoryFullscreen();
+  $('invFullscreen').classList.add('open');
+});
+$('invFullscreenClose').addEventListener('click', () => {
+  $('invFullscreen').classList.remove('open');
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && $('invFullscreen').classList.contains('open')) {
+    $('invFullscreen').classList.remove('open');
+  }
+});
+
+/* ═══════════════  TABS  ═══════════════════════════════════ */
+document.querySelectorAll('.tabs button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    S.activeTab = btn.dataset.tab;
+    $('tabBom').style.display = S.activeTab === 'bom' ? '' : 'none';
+    $('tabDevices').style.display = S.activeTab === 'devices' ? '' : 'none';
+    $('tabInventory').style.display = S.activeTab === 'inventory' ? '' : 'none';
+    if (S.activeTab === 'devices') fetchDeviceAssignments();
+    if (S.activeTab === 'inventory') renderInventoryOverview();
+  });
+});
+
+/* ═══════════════  SEARCH  ═════════════════════════════════ */
+let compTO = null;
+$('compSearch').addEventListener('input', e => {
+  clearTimeout(compTO);
+  compTO = setTimeout(() => {
+    S.compSearch = e.target.value.trim().toLowerCase();
+    renderComponents();
+  }, 200);
+});
+let asmTO = null;
+$('asmSearch').addEventListener('input', e => {
+  clearTimeout(asmTO);
+  asmTO = setTimeout(() => {
+    S.asmSearch = e.target.value.trim().toLowerCase();
+    renderAssemblies();
+  }, 200);
+});
+
+/* ═══════════════  KEYBOARD  ══════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    $('compModal').classList.remove('open');
+    $('asmModal').classList.remove('open');
+    $('qtyModal').classList.remove('open');
+  }
+});
+
+/* ═══════════════  QR LABEL  ═══════════════════════════════ */
+let _qrInstance = null;
+
+function openQrLabel(type, id, code, name) {
+  $('qrLabelCode').textContent = code;
+  $('qrLabelName').textContent = name;
+  $('qrLabelType').textContent = type === 'component' ? 'Component' : 'Assembly';
+
+  // Clear and regenerate QR code
+  const container = $('qrCodeDiv');
+  container.innerHTML = '';
+  _qrInstance = null;
+
+  const qrText = `STOCKNET:${type.toUpperCase()}:${code}:${name}`;
+  if (typeof QRCode !== 'undefined') {
+    try {
+      _qrInstance = new QRCode(container, {
+        text: qrText,
+        width: 160, height: 160,
+        colorDark: '#000000', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+    } catch (err) {
+      container.innerHTML = `<div style="font-size:11px;color:var(--text-dim);padding:8px;">QR unavailable — ${qrText}</div>`;
+    }
+  } else {
+    container.innerHTML = `<div style="font-size:11px;color:var(--text-dim);padding:8px;">QR lib not loaded. Text: ${qrText}</div>`;
+  }
+
+  $('qrModal').classList.add('open');
+}
+
+$('qrModalClose').addEventListener('click', () => $('qrModal').classList.remove('open'));
+$('qrModal').addEventListener('click', e => { if (e.target === e.currentTarget) $('qrModal').classList.remove('open'); });
+$('qrModalPrint').addEventListener('click', () => {
+  const code = $('qrLabelCode').textContent;
+  const name = $('qrLabelName').textContent;
+  const type = $('qrLabelType').textContent;
+  const img = $('qrCodeDiv').querySelector('img');
+  const qrSrc = img ? img.src : '';
+  const w = window.open('', '_blank', 'width=400,height=500');
+  w.document.write(`<!DOCTYPE html><html><head><title>Bin Label — ${code}</title>
+    <style>body{font-family:sans-serif;text-align:center;padding:24px;}
+    .code{font-size:28px;font-weight:800;letter-spacing:2px;margin:12px 0;}
+    .name{font-size:16px;margin-bottom:8px;} .type{font-size:11px;text-transform:uppercase;color:#888;margin-bottom:16px;}
+    img{border-radius:4px;}</style></head>
+    <body onload="window.print()">
+    <div class="type">${type}</div>
+    <div class="code">${code}</div>
+    <div class="name">${name}</div>
+    ${qrSrc ? `<img src="${qrSrc}" width="160" height="160" />` : ''}
+    </body></html>`);
+  w.document.close();
+});
+
+/* ═══════════════  CYCLE COUNT  ════════════════════════════ */
+function openCycleCountSchedule(type, id, name, currentCount) {
+  $('cycleItemName').textContent = name;
+  $('cycleItemId').value = id;
+  $('cycleItemType').value = type;
+  $('cycleSysCount').value = currentCount;
+  $('cycleNotes').value = '';
+  // Default to tomorrow
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  $('cycleDate').value = tomorrow.toISOString().slice(0, 10);
+  $('cycleModal').classList.add('open');
+}
+
+$('cycleModalCancel').addEventListener('click', () => $('cycleModal').classList.remove('open'));
+$('cycleModal').addEventListener('click', e => { if (e.target === e.currentTarget) $('cycleModal').classList.remove('open'); });
+
+$('cycleModalSave').addEventListener('click', async () => {
+  const itemId = $('cycleItemId').value;
+  const itemType = $('cycleItemType').value;
+  const date = $('cycleDate').value;
+  const sysCount = parseFloat($('cycleSysCount').value);
+  const notes = $('cycleNotes').value.trim();
+  if (!date) { toast('Select a scheduled date', 'error'); return; }
+
+  const body = {
+    scheduled_date: date,
+    system_count: sysCount,
+    notes: notes || null,
+  };
+  if (itemType === 'component') body.component_id = itemId;
+  else body.assembly_id = itemId;
+
+  try {
+    const r = await fetch('/api/cycle-counts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      toast('Cycle count scheduled', 'success');
+      $('cycleModal').classList.remove('open');
+    } else toast(d.error || 'Failed to schedule', 'error');
+  } catch (e) { toast('Network error', 'error'); }
+});
+
+/* ═══════════════  HEALTH MODAL  ═══════════════════════════ */
+const PLOTLY_LAYOUT_BASE = {
+  paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+  font: { color: '#828a98', size: 11 },
+  margin: { t: 4, b: 30, l: 44, r: 10 },
+  xaxis: { gridcolor: '#33393f', zeroline: false, showline: false },
+  yaxis: { gridcolor: '#33393f', zeroline: false, showline: false },
+  showlegend: false,
+};
+const PLOTLY_CONFIG = { displayModeBar: false, responsive: true };
+
+let _healthDevice = null;
+
+async function openHealthModal(deviceName) {
+  _healthDevice = deviceName;
+  $('healthModalTitle').textContent = `Counter Health: ${deviceName}`;
+  $('healthModal').classList.add('open');
+  await loadHealthData();
+}
+
+async function loadHealthData() {
+  if (!_healthDevice) return;
+  const hours = $('healthHours').value;
+  $('healthReadingCount').textContent = 'Loading…';
+  try {
+    const r = await fetch(`/api/devices/${encodeURIComponent(_healthDevice)}/health?hours=${hours}`);
+    const d = await r.json();
+    if (!d.ok) { $('healthReadingCount').textContent = d.error || 'Error'; return; }
+    const readings = d.readings || [];
+    $('healthReadingCount').textContent = `${readings.length} reading${readings.length !== 1 ? 's' : ''}`;
+
+    const ts     = readings.map(r => r.ts);
+    const batt   = readings.map(r => r.battery_pct);
+    const rssi   = readings.map(r => r.rssi);
+    const temp   = readings.map(r => r.temperature_c);
+
+    const traceStyle = (color) => ({
+      type: 'scatter', mode: 'lines', line: { color, width: 1.5, shape: 'spline' },
+    });
+
+    // Battery %
+    Plotly.react('chartBattery',
+      [{ ...traceStyle('#3ba55d'), x: ts, y: batt, fill: 'tozeroy',
+         fillcolor: 'rgba(59,165,93,0.08)' }],
+      { ...PLOTLY_LAYOUT_BASE, yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, range: [0, 105], ticksuffix: '%' } },
+      PLOTLY_CONFIG
+    );
+
+    // RSSI (dBm — typically negative)
+    Plotly.react('chartRssi',
+      [{ ...traceStyle('#4a90c4'), x: ts, y: rssi }],
+      { ...PLOTLY_LAYOUT_BASE, yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, ticksuffix: ' dBm' } },
+      PLOTLY_CONFIG
+    );
+
+    // Temperature
+    Plotly.react('chartTemp',
+      [{ ...traceStyle('#e8a418'), x: ts, y: temp }],
+      { ...PLOTLY_LAYOUT_BASE, yaxis: { ...PLOTLY_LAYOUT_BASE.yaxis, ticksuffix: '°C' } },
+      PLOTLY_CONFIG
+    );
+  } catch (e) { $('healthReadingCount').textContent = 'Network error'; }
+}
+
+$('healthModalClose').addEventListener('click', () => {
+  $('healthModal').classList.remove('open');
+  _healthDevice = null;
+});
+$('healthModal').addEventListener('click', e => {
+  if (e.target === $('healthModal')) { $('healthModal').classList.remove('open'); _healthDevice = null; }
+});
+$('healthRefreshBtn').addEventListener('click', loadHealthData);
+$('healthHours').addEventListener('change', loadHealthData);
+
+/* ═══════════════  POLLING  ════════════════════════════════ */
+let pollTimer = null;
+function startPolling() {
+  stopPolling();
+  pollTimer = setInterval(async () => {
+    await Promise.all([fetchComponents(), fetchAssemblies(), fetchDeviceAssignments()]);
+    // Velocity is slower-changing — refresh every 5 cycles (~50s)
+    if (typeof startPolling._tick === 'undefined') startPolling._tick = 0;
+    if (++startPolling._tick % 5 === 0) fetchVelocity();
+  }, 10000); // refresh every 10s
+}
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+// Pause polling while user is on another tab
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopPolling(); else startPolling();
+});
+
+/* ═══════════════  INIT  ═════════════════════════════════ */
+(async function init() {
+  await Promise.all([fetchComponents(), fetchAssemblies(), fetchDeviceAssignments()]);
+  fetchVelocity(); // non-blocking, populates after initial render
+  startPolling();
+})();
+</script>
+</body>
+</html>

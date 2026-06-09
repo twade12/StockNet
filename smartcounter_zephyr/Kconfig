@@ -1,0 +1,49 @@
+#
+# Smart Counter — application-private Kconfig symbols
+#
+# Anything project-specific (not a Zephyr subsystem flag) belongs here
+# rather than in prj.conf. Default values can be overridden per-board
+# via board overlays or via `west build -- -DCONFIG_...=...`.
+#
+
+mainmenu "Smart Counter"
+
+source "Kconfig.zephyr"
+
+menu "Smart Counter application"
+
+config SMARTCOUNTER_DEFAULT_POST_INTERVAL_SEC
+	int "Default seconds between HTTP POSTs of counter state"
+	default 3600
+	range 5 86400
+	help
+	  How often the device wakes from deep sleep to push its state.
+	  May be overridden at runtime via BLE/HTTP and stored in settings.
+
+config SMARTCOUNTER_DEFAULT_DISPLAY_TIMEOUT_SEC
+	int "Default seconds before the OLED powers off after activity"
+	default 15
+	range 3 600
+
+config SMARTCOUNTER_BLE_ACTIVE_WINDOW_MS
+	int "How long BLE advertising stays up after user activity (ms)"
+	default 60000
+
+config SMARTCOUNTER_BATTERY_SAMPLES
+	int "Number of ADC samples averaged per battery reading"
+	default 8
+	range 1 64
+
+config SMARTCOUNTER_DEFAULT_API_URL
+	string "Default HTTPS endpoint for counter POSTs"
+	default "https://stocknet.resensys.cloud/api/counter"
+
+config SMARTCOUNTER_DEFAULT_WIFI_SSID
+	string "Default WiFi SSID (used only if NVS slot is empty)"
+	default ""
+
+config SMARTCOUNTER_DEFAULT_WIFI_PASS
+	string "Default WiFi password (used only if NVS slot is empty)"
+	default ""
+
+endmenu

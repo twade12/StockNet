@@ -1,0 +1,9 @@
+sample:
+  description: Smart Counter — Zephyr port of the Arduino smartcounter_battery sketch
+  name: smartcounter
+tests:
+  app.build:
+    platform_allow:
+      - xiao_esp32s3/esp32s3/procpu
+    tags: smartcounter
+    extra_args: CONF_FILE=prj.conf

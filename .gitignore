@@ -1,0 +1,56 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment / secrets
+.env
+.env.*
+*.env
+instance/
+
+# Flask / runtime data
+counter_events.jsonl
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Zephyr / CMake build output
+smartcounter_zephyr/build/
+smartcounter_zephyr/.west/
+.west/
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+*.a
+*.o
+
+# C/C++ build artifacts
+*.out
+*.so
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

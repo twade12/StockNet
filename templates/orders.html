@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>StockNet - Production Orders</title>
+  <style>
+    :root {
+      --bg: #121417; --panel: #1b1e24; --panel-2: #23272f; --surface: #2a2f38;
+      --text: #d8dce3; --text-dim: #828a98; --border: #33393f;
+      --accent: #d4870e; --accent-2: #e69b1e;
+      --ok: #3ba55d; --warn: #e8a418; --danger: #d44040; --info: #4a90c4;
+      --mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+      --radius: 6px;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body { font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .wrap { max-width: 1400px; margin: 0 auto; padding: 12px 16px; }
+    label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .6px; }
+    input, select, textarea, button {
+      border-radius: var(--radius); border: 1px solid var(--border);
+      background: var(--surface); color: var(--text); padding: 8px 10px; font-size: 13px; width: 100%;
+    }
+    textarea { resize: vertical; min-height: 60px; }
+    input::placeholder, textarea::placeholder { color: var(--text-dim); opacity: .5; }
+    button { cursor: pointer; background: var(--accent); color: #000; font-weight: 700; border: none; transition: background .15s; }
+    button:hover { background: var(--accent-2); }
+    button.secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    button.secondary:hover { border-color: var(--accent); color: var(--accent); }
+    button.danger-btn { background: var(--danger); color: #fff; }
+    button.danger-btn:hover { background: #c03030; }
+    button.ok-btn { background: var(--ok); color: #fff; }
+    button.ok-btn:hover { background: #2e9050; }
+    button.info-btn { background: var(--info); color: #fff; }
+    button.info-btn:hover { background: #3a7eb4; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 18px; background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .logo { font-size: 20px; font-weight: 800; letter-spacing: -.5px; color: var(--accent); font-family: var(--mono); }
+    .logo span { color: var(--text); font-weight: 400; }
+    .nav-link {
+      text-decoration: none; color: var(--text-dim); font-size: 13px;
+      padding: 6px 12px; border-radius: var(--radius); border: 1px solid var(--border); transition: all .15s;
+    }
+    .nav-link:hover { color: var(--accent); border-color: var(--accent); }
+
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+    .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .panel-header strong { font-size: 13px; text-transform: uppercase; letter-spacing: .5px; }
+
+    /* Status badges */
+    .status-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 3px;
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+    }
+    .status-badge.draft       { background: rgba(130,138,152,.12); color: var(--text-dim); }
+    .status-badge.confirmed   { background: rgba(74,144,196,.12);  color: var(--info); }
+    .status-badge.in_progress { background: rgba(212,135,14,.12);  color: var(--accent); }
+    .status-badge.completed   { background: rgba(59,165,93,.12);   color: var(--ok); }
+    .status-badge.cancelled   { background: rgba(212,64,64,.12);   color: var(--danger); }
+
+    /* Summary cards */
+    .summary-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 14px; }
+    .summary-card {
+      padding: 12px 14px; background: var(--panel-2); border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .summary-card .sc-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .6px; }
+    .summary-card .sc-value { font-size: 24px; font-weight: 800; color: var(--accent); font-family: var(--mono); margin-top: 2px; }
+    .summary-card .sc-value.ok   { color: var(--ok); }
+    .summary-card .sc-value.warn { color: var(--warn); }
+
+    /* Filter row */
+    .filter-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+    .filter-row input  { flex: 1; min-width: 200px; max-width: 340px; }
+    .filter-row select { width: auto; min-width: 140px; }
+    .filter-row button { width: auto; padding: 8px 16px; }
+
+    /* Order cards */
+    .order-card {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: 8px; background: var(--panel-2);
+      transition: border-color .15s;
+    }
+    .order-card:hover { border-color: var(--accent); }
+    .order-card.expanded { border-color: var(--accent); }
+    .order-card-header {
+      display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+      cursor: pointer; user-select: none;
+    }
+    .order-number { font-weight: 700; font-size: 14px; font-family: var(--mono); color: var(--accent); }
+    .order-type-label { font-size: 11px; color: var(--text-dim); }
+    .order-ref { font-size: 12px; color: var(--info); }
+    .order-meta { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .order-meta .qty-pill {
+      font-size: 11px; font-family: var(--mono);
+      padding: 2px 8px; background: var(--surface); border-radius: 4px; color: var(--text-dim);
+    }
+    .order-due { font-size: 11px; color: var(--text-dim); }
+    .order-due.overdue { color: var(--danger); font-weight: 700; }
+
+    /* Expanded order body */
+    .order-body { border-top: 1px solid var(--border); padding: 14px; display: none; }
+    .order-card.expanded .order-body { display: block; }
+
+    .order-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 860px) { .order-grid { grid-template-columns: 1fr; } }
+
+    .section-title {
+      font-size: 11px; text-transform: uppercase; letter-spacing: .7px;
+      color: var(--accent); font-weight: 700; margin-bottom: 8px;
+      padding-bottom: 4px; border-bottom: 1px solid var(--border);
+    }
+
+    /* Lines table */
+    .lines-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .lines-table th {
+      text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
+      color: var(--text-dim); padding: 4px 8px; border-bottom: 1px solid var(--border);
+    }
+    .lines-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.03); }
+    .lines-table tr:last-child td { border-bottom: none; }
+    .lines-table .qty { font-family: var(--mono); font-weight: 700; color: var(--accent); }
+    .lines-table .del-btn {
+      width: auto; padding: 2px 6px; font-size: 10px;
+      background: transparent; color: var(--text-dim); border: 1px solid transparent;
+    }
+    .lines-table .del-btn:hover { color: var(--danger); border-color: rgba(212,64,64,.3); }
+
+    /* Add line row */
+    .add-line-row { display: flex; gap: 8px; margin-top: 8px; align-items: flex-end; }
+    .add-line-row select { flex: 1; }
+    .add-line-row input[type="number"] { width: 90px; flex-shrink: 0; }
+    .add-line-row button { width: auto; padding: 8px 14px; flex-shrink: 0; }
+
+    /* Materials table */
+    .materials-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .materials-table th {
+      text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
+      color: var(--text-dim); padding: 4px 8px; border-bottom: 1px solid var(--border);
+    }
+    .materials-table td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,.03); }
+    .materials-table tr:last-child td { border-bottom: none; }
+    .mat-num { font-family: var(--mono); font-size: 11px; color: var(--info); }
+    .mat-avail { font-family: var(--mono); font-weight: 700; }
+    .mat-avail.ok      { color: var(--ok); }
+    .mat-avail.partial { color: var(--warn); }
+    .mat-avail.shortage { color: var(--danger); }
+    .mat-status-dot {
+      width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px;
+    }
+    .mat-status-dot.ok      { background: var(--ok); }
+    .mat-status-dot.partial { background: var(--warn); }
+    .mat-status-dot.shortage { background: var(--danger); }
+
+    /* Action bar */
+    .order-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .order-actions button { width: auto; padding: 7px 16px; font-size: 12px; }
+
+    /* Shortfall warning */
+    .shortfall-box {
+      border: 1px solid var(--warn); border-radius: var(--radius);
+      background: rgba(232,164,24,.05); padding: 10px 12px;
+      margin-top: 10px; font-size: 12px;
+    }
+    .shortfall-box strong { color: var(--warn); }
+
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.65); z-index: 100;
+      justify-content: center; align-items: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; width: 480px;
+      max-width: 95vw; max-height: 90vh; overflow-y: auto;
+    }
+    .modal h2 { font-size: 16px; margin-bottom: 14px; }
+    .modal .field { margin-bottom: 12px; }
+    .modal .field label { display: block; margin-bottom: 3px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+    .modal-actions button { width: auto; padding: 8px 18px; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 20px; right: 20px; z-index: 300;
+      padding: 10px 18px; border-radius: var(--radius); font-size: 13px; font-weight: 600;
+      opacity: 0; transition: opacity .3s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+    .toast.success { background: var(--ok); color: #fff; }
+    .toast.error   { background: var(--danger); color: #fff; }
+    .toast.warn    { background: var(--warn); color: #000; }
+
+    .empty-state {
+      color: var(--text-dim); text-align: center; padding: 48px 0;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">STOCKNET <span>// Production Orders</span></div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <a href="/bom" class="nav-link">BOM Manager</a>
+      <a href="/procurement" class="nav-link">Procurement</a>
+      <a href="/" class="nav-link">&larr; Dashboard</a>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-row" id="summaryRow">
+    <div class="summary-card"><div class="sc-label">Open Orders</div><div class="sc-value" id="sumOpen">--</div></div>
+    <div class="summary-card"><div class="sc-label">In Progress</div><div class="sc-value" id="sumInProgress">--</div></div>
+    <div class="summary-card"><div class="sc-label">Completed (30d)</div><div class="sc-value ok" id="sumCompleted">--</div></div>
+    <div class="summary-card"><div class="sc-label">Overdue</div><div class="sc-value warn" id="sumOverdue">--</div></div>
+  </div>
+
+  <!-- Orders Panel -->
+  <div class="panel">
+    <div class="panel-header">
+      <strong>Orders</strong>
+      <button id="newOrderBtn" style="width:auto;padding:7px 16px;font-size:12px;">+ New Order</button>
+    </div>
+    <div class="filter-row">
+      <input type="text" id="orderSearch" placeholder="Search order number, customer ref..." />
+      <select id="orderStatusFilter">
+        <option value="">All Statuses</option>
+        <option value="draft">Draft</option>
+        <option value="confirmed">Confirmed</option>
+        <option value="in_progress">In Progress</option>
+        <option value="completed">Completed</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+      <select id="orderTypeFilter">
+        <option value="">All Types</option>
+        <option value="production">Production</option>
+        <option value="quotation">Quotation</option>
+        <option value="sales_order">Sales Order</option>
+      </select>
+    </div>
+    <div id="orderList"><div class="empty-state">Loading orders...</div></div>
+  </div>
+
+</div>
+
+<!-- Create Order Modal -->
+<div class="modal-overlay" id="newOrderModal">
+  <div class="modal">
+    <h2>New Production Order</h2>
+    <div class="form-row">
+      <div class="field">
+        <label>Order Number *</label>
+        <input id="newOrderNum" type="text" placeholder="e.g. JOB-2026-001" />
+      </div>
+      <div class="field">
+        <label>Order Type</label>
+        <select id="newOrderType">
+          <option value="production">Production Run</option>
+          <option value="sales_order">Sales Order</option>
+          <option value="quotation">Quotation</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row" style="margin-top:10px;">
+      <div class="field">
+        <label>Customer / Reference</label>
+        <input id="newOrderRef" type="text" placeholder="Customer name or PO ref" />
+      </div>
+      <div class="field">
+        <label>Due Date</label>
+        <input id="newOrderDue" type="date" />
+      </div>
+    </div>
+    <div class="field" style="margin-top:10px;">
+      <label>Notes</label>
+      <textarea id="newOrderNotes" placeholder="Optional notes..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" id="newOrderCancel">Cancel</button>
+      <button id="newOrderSave">Create Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════  STATE  ═══════════ */
+const S = {
+  orders: [],
+  assemblies: [],
+  expandedId: null,
+  orderDetails: {},   // cache keyed by order_id
+};
+
+/* ═══════════  HELPERS  ═══════════ */
+function $(id) { return document.getElementById(id); }
+function toast(msg, type = 'success') {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = `toast show ${type}`;
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+function statusBadge(s) {
+  return `<span class="status-badge ${s}">${s.replace('_', ' ')}</span>`;
+}
+function isOverdue(due, status) {
+  return due && !['completed','cancelled'].includes(status) &&
+    new Date(due) < new Date();
+}
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'});
+}
+
+/* ═══════════  FETCH  ═══════════ */
+async function fetchOrders() {
+  const r = await fetch('/api/orders');
+  const d = await r.json();
+  S.orders = d.orders || [];
+  renderOrders();
+  renderSummary();
+}
+
+async function fetchAssemblies() {
+  const r = await fetch('/api/assemblies');
+  const d = await r.json();
+  S.assemblies = d.assemblies || [];
+}
+
+async function fetchOrderDetail(orderId) {
+  const r = await fetch(`/api/orders/${orderId}`);
+  const d = await r.json();
+  if (d.ok) S.orderDetails[orderId] = d;
+  return d;
+}
+
+/* ═══════════  SUMMARY  ═══════════ */
+function renderSummary() {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() - 30);
+  let open = 0, inProg = 0, completed = 0, overdue = 0;
+  for (const o of S.orders) {
+    if (['draft','confirmed','in_progress'].includes(o.status)) open++;
+    if (o.status === 'in_progress') inProg++;
+    if (o.status === 'completed' && new Date(o.completed_at) >= cutoff) completed++;
+    if (isOverdue(o.due_date, o.status)) overdue++;
+  }
+  $('sumOpen').textContent = open;
+  $('sumInProgress').textContent = inProg;
+  $('sumCompleted').textContent = completed;
+  $('sumOverdue').textContent = overdue;
+}
+
+/* ═══════════  RENDER ORDERS  ═══════════ */
+function getFilters() {
+  return {
+    search: $('orderSearch').value.trim().toLowerCase(),
+    status: $('orderStatusFilter').value,
+    type:   $('orderTypeFilter').value,
+  };
+}
+
+function renderOrders() {
+  const { search, status, type } = getFilters();
+  let list = S.orders.filter(o => {
+    if (status && o.status !== status) return false;
+    if (type   && o.order_type !== type) return false;
+    if (search && !o.order_number.toLowerCase().includes(search) &&
+        !(o.customer_ref || '').toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  const el = $('orderList');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state">No orders match your filters.</div>';
+    return;
+  }
+
+  el.innerHTML = list.map(o => {
+    const expanded = S.expandedId === o.order_id;
+    const overdue  = isOverdue(o.due_date, o.status);
+    const dueHtml  = o.due_date
+      ? `<span class="order-due ${overdue ? 'overdue' : ''}">${overdue ? '⚠ ' : ''}Due ${fmtDate(o.due_date)}</span>`
+      : '';
+    const detail   = S.orderDetails[o.order_id];
+
+    return `
+      <div class="order-card ${expanded ? 'expanded' : ''}" data-order-id="${o.order_id}">
+        <div class="order-card-header" onclick="toggleOrder('${o.order_id}')">
+          <div>
+            <div class="order-number">${o.order_number}</div>
+            <div class="order-type-label">${o.order_type.replace('_',' ')}${o.customer_ref ? ' · ' + o.customer_ref : ''}</div>
+          </div>
+          ${statusBadge(o.status)}
+          <div class="order-meta">
+            ${dueHtml}
+            <span class="qty-pill">${o.line_count} line${o.line_count !== 1 ? 's' : ''} · ${o.total_qty} units</span>
+            <span style="color:var(--text-dim);font-size:14px;">${expanded ? '▲' : '▼'}</span>
+          </div>
+        </div>
+        ${expanded && detail ? renderOrderBody(o, detail) : (expanded ? '<div class="order-body"><div style="color:var(--text-dim);padding:12px;">Loading...</div></div>' : '')}
+      </div>`;
+  }).join('');
+}
+
+function renderOrderBody(o, detail) {
+  const isDraft = o.status === 'draft';
+  const canConfirm = o.status === 'draft' && detail.lines.length > 0;
+  const canStart    = o.status === 'confirmed';
+  const canComplete = ['confirmed','in_progress'].includes(o.status);
+  const canCancel   = !['completed','cancelled'].includes(o.status);
+
+  const asmOpts = S.assemblies.map(a =>
+    `<option value="${a.assembly_id}">${a.assembly_code} — ${a.assembly_name}</option>`
+  ).join('');
+
+  const linesHtml = detail.lines.length === 0
+    ? '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">No assembly lines yet — add one below.</div>'
+    : `<table class="lines-table">
+        <tr><th>Assembly</th><th>Code</th><th>Stock</th><th>Qty</th>${isDraft ? '<th></th>' : ''}</tr>
+        ${detail.lines.map(l => `
+          <tr>
+            <td>${l.assembly_name}</td>
+            <td style="font-family:var(--mono);font-size:11px;color:var(--info);">${l.assembly_code}</td>
+            <td style="font-family:var(--mono);font-size:11px;">${l.asm_stock}</td>
+            <td class="qty">${l.qty_ordered}${l.qty_completed > 0 ? ` <span style="color:var(--ok);font-size:10px;">(${l.qty_completed} done)</span>` : ''}</td>
+            ${isDraft ? `<td><button class="del-btn" onclick="deleteLine('${o.order_id}','${l.line_id}')">✕</button></td>` : ''}
+          </tr>`).join('')}
+      </table>`;
+
+  const matHtml = detail.materials.length === 0
+    ? '<div style="color:var(--text-dim);font-size:12px;padding:8px 0;">No BOM data available.</div>'
+    : `<table class="materials-table">
+        <tr><th>Component</th><th>Needed</th><th>Available</th><th>Status</th></tr>
+        ${detail.materials.map(m => `
+          <tr>
+            <td>
+              <span class="mat-num">${m.part_id}</span>
+              <div style="font-size:11px;color:var(--text);">${m.part_name}</div>
+            </td>
+            <td style="font-family:var(--mono);">${m.qty_needed}</td>
+            <td class="mat-avail ${m.status}">${m.available}</td>
+            <td>
+              <span class="mat-status-dot ${m.status}"></span>
+              <span style="font-size:10px;color:var(--text-dim);">${m.status}</span>
+              ${m.status === 'shortage' ? `<div style="font-size:10px;color:var(--danger);">short ${(m.qty_needed - m.available).toFixed(0)}</div>` : ''}
+            </td>
+          </tr>`).join('')}
+      </table>`;
+
+  return `<div class="order-body">
+    ${o.notes ? `<div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;padding:8px 10px;background:var(--surface);border-radius:4px;">${o.notes}</div>` : ''}
+    <div class="order-grid">
+      <div>
+        <div class="section-title">Assembly Lines</div>
+        ${linesHtml}
+        ${isDraft ? `
+          <div class="add-line-row">
+            <select id="addLineAsm_${o.order_id}"><option value="">Select assembly...</option>${asmOpts}</select>
+            <input type="number" id="addLineQty_${o.order_id}" min="1" value="1" placeholder="Qty" />
+            <button onclick="addLine('${o.order_id}')">+ Add</button>
+          </div>` : ''}
+      </div>
+      <div>
+        <div class="section-title">Material Requirements</div>
+        ${matHtml}
+      </div>
+    </div>
+    <div class="order-actions">
+      ${canConfirm   ? `<button class="ok-btn" onclick="confirmOrder('${o.order_id}')">✔ Confirm &amp; Reserve</button>` : ''}
+      ${canStart     ? `<button class="info-btn" onclick="startOrder('${o.order_id}')">▶ Start Production</button>` : ''}
+      ${canComplete  ? `<button class="ok-btn" onclick="completeOrder('${o.order_id}')">✔ Complete &amp; Post Stock</button>` : ''}
+      ${canCancel    ? `<button class="danger-btn" onclick="cancelOrder('${o.order_id}')">✕ Cancel</button>` : ''}
+      <span style="margin-left:auto;font-size:11px;color:var(--text-dim);">
+        Created ${fmtDate(o.created_at)}
+        ${o.confirmed_at ? ' · Confirmed ' + fmtDate(o.confirmed_at) : ''}
+        ${o.completed_at ? ' · Completed ' + fmtDate(o.completed_at) : ''}
+      </span>
+    </div>
+  </div>`;
+}
+
+async function toggleOrder(orderId) {
+  if (S.expandedId === orderId) {
+    S.expandedId = null;
+    renderOrders();
+    return;
+  }
+  S.expandedId = orderId;
+  renderOrders(); // show loading state
+  await fetchOrderDetail(orderId);
+  renderOrders();
+}
+
+/* ═══════════  ORDER ACTIONS  ═══════════ */
+async function addLine(orderId) {
+  const asmSel = $(`addLineAsm_${orderId}`);
+  const qtySel = $(`addLineQty_${orderId}`);
+  const aid = asmSel.value;
+  const qty = parseFloat(qtySel.value);
+  if (!aid) { toast('Select an assembly', 'error'); return; }
+  if (!qty || qty <= 0) { toast('Enter a valid quantity', 'error'); return; }
+  const r = await fetch(`/api/orders/${orderId}/lines`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ assembly_id: aid, qty_ordered: qty }),
+  });
+  const d = await r.json();
+  if (d.ok) {
+    toast('Line added', 'success');
+    await fetchOrderDetail(orderId);
+    renderOrders();
+  } else toast(d.error || 'Failed', 'error');
+}
+
+async function deleteLine(orderId, lineId) {
+  if (!confirm('Remove this line from the order?')) return;
+  const r = await fetch(`/api/orders/${orderId}/lines/${lineId}`, { method: 'DELETE' });
+  const d = await r.json();
+  if (d.ok) {
+    toast('Line removed', 'success');
+    await fetchOrderDetail(orderId);
+    renderOrders();
+  } else toast(d.error || 'Failed', 'error');
+}
+
+async function confirmOrder(orderId) {
+  if (!confirm('Confirm this order? Component stock will be reserved.')) return;
+  const r = await fetch(`/api/orders/${orderId}/confirm`, { method: 'POST' });
+  const d = await r.json();
+  if (d.ok) {
+    if (d.shortfalls && d.shortfalls.length > 0) {
+      const sf = d.shortfalls.map(s => `${s.part_id}: short ${s.shortfall.toFixed(0)}`).join(', ');
+      toast(`Confirmed with shortfalls: ${sf}`, 'warn');
+    } else {
+      toast('Order confirmed — materials reserved', 'success');
+    }
+    await fetchOrders();
+    await fetchOrderDetail(orderId);
+    renderOrders();
+  } else toast(d.error || 'Failed', 'error');
+}
+
+async function startOrder(orderId) {
+  const r = await fetch(`/api/orders/${orderId}/start`, { method: 'POST' });
+  const d = await r.json();
+  if (d.ok) {
+    toast('Order moved to In Progress', 'success');
+    await fetchOrders();
+    renderOrders();
+  } else toast(d.error || 'Failed', 'error');
+}
+
+async function completeOrder(orderId) {
+  const order = S.orders.find(o => o.order_id === orderId);
+  const orderNum = order ? order.order_number : orderId;
+  if (!confirm(`Complete order ${orderNum}?\n\nThis will:\n• Deduct reserved components from inventory\n• Add produced assemblies to inventory\n• Sync all assigned counter devices`)) return;
+  const r = await fetch(`/api/orders/${orderId}/complete`, { method: 'POST' });
+  const d = await r.json();
+  if (d.ok) {
+    const synced = d.commands_enqueued?.length || 0;
+    toast(`Order completed${synced > 0 ? ` · ${synced} counters synced` : ''}`, 'success');
+    await fetchOrders();
+    delete S.orderDetails[orderId];
+    renderOrders();
+  } else toast(d.error || 'Failed', 'error');
+}
+
+async function cancelOrder(orderId) {
+  if (!confirm('Cancel this order? Any reserved materials will be released.')) return;
+  const r = await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' });
+  const d = await r.json();
+  if (d.ok) {
+    toast('Order cancelled — reservations released', 'success');
+    await fetchOrders();
+    delete S.orderDetails[orderId];
+    renderOrders();
+  } else toast(d.error || 'Failed', 'error');
+}
+
+/* ═══════════  CREATE ORDER MODAL  ═══════════ */
+$('newOrderBtn').addEventListener('click', () => {
+  $('newOrderNum').value = '';
+  $('newOrderRef').value = '';
+  $('newOrderDue').value = '';
+  $('newOrderNotes').value = '';
+  $('newOrderType').value = 'production';
+  $('newOrderModal').classList.add('open');
+  $('newOrderNum').focus();
+});
+$('newOrderCancel').addEventListener('click', () => $('newOrderModal').classList.remove('open'));
+$('newOrderModal').addEventListener('click', e => { if (e.target === e.currentTarget) $('newOrderModal').classList.remove('open'); });
+
+$('newOrderSave').addEventListener('click', async () => {
+  const num = $('newOrderNum').value.trim();
+  if (!num) { toast('Order number is required', 'error'); return; }
+  const r = await fetch('/api/orders', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      order_number:  num,
+      order_type:    $('newOrderType').value,
+      customer_ref:  $('newOrderRef').value.trim(),
+      due_date:      $('newOrderDue').value || null,
+      notes:         $('newOrderNotes').value.trim(),
+    }),
+  });
+  const d = await r.json();
+  if (d.ok) {
+    toast('Order created', 'success');
+    $('newOrderModal').classList.remove('open');
+    S.expandedId = d.order.order_id;
+    await fetchOrders();
+    await fetchOrderDetail(d.order.order_id);
+    renderOrders();
+  } else toast(d.error || 'Failed', 'error');
+});
+
+/* ═══════════  FILTER LISTENERS  ═══════════ */
+let searchTO = null;
+$('orderSearch').addEventListener('input', () => {
+  clearTimeout(searchTO);
+  searchTO = setTimeout(renderOrders, 200);
+});
+$('orderStatusFilter').addEventListener('change', renderOrders);
+$('orderTypeFilter').addEventListener('change', renderOrders);
+
+/* ═══════════  KEYBOARD  ═══════════ */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') $('newOrderModal').classList.remove('open');
+});
+
+/* ═══════════  INIT  ═══════════ */
+(async function init() {
+  await Promise.all([fetchOrders(), fetchAssemblies()]);
+  // Poll every 30s
+  setInterval(() => { if (!document.hidden) fetchOrders(); }, 30000);
+})();
+</script>
+</body>
+</html>

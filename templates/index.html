@@ -1,0 +1,1524 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>StockNet - Inventory Management</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    /* ═══════════════════  INDUSTRIAL THEME  ═══════════════════ */
+    :root {
+      --bg:       #121417;
+      --panel:    #1b1e24;
+      --panel-2:  #23272f;
+      --surface:  #2a2f38;
+      --text:     #d8dce3;
+      --text-dim: #828a98;
+      --border:   #33393f;
+      --accent:   #d4870e;
+      --accent-2: #e69b1e;
+      --ok:       #3ba55d;
+      --warn:     #e8a418;
+      --danger:   #d44040;
+      --info:     #4a90c4;
+      --mono:     'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+      --radius:   6px;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body { font-family: Inter, system-ui, sans-serif; background: var(--bg); color: var(--text); }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── Layout ── */
+    .wrap { max-width: 1700px; margin: 0 auto; padding: 12px 16px; }
+
+    /* ── Header ── */
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 18px; background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 12px;
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .logo {
+      font-size: 20px; font-weight: 800; letter-spacing: -0.5px;
+      color: var(--accent); font-family: var(--mono);
+    }
+    .logo span { color: var(--text); font-weight: 400; }
+    .header-stats { display: flex; gap: 18px; }
+    .header-stat { text-align: center; }
+    .header-stat .val {
+      font-size: 18px; font-weight: 700; font-family: var(--mono);
+      line-height: 1.1;
+    }
+    .header-stat .lbl { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .8px; }
+
+    /* ── Panels ── */
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px;
+    }
+
+    /* ── Form elements ── */
+    label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .6px; }
+    input, select, button {
+      border-radius: var(--radius); border: 1px solid var(--border);
+      background: var(--surface); color: var(--text);
+      padding: 8px 10px; font-size: 13px; width: 100%;
+    }
+    input::placeholder { color: var(--text-dim); opacity: .5; }
+    button {
+      cursor: pointer; background: var(--accent); color: #000;
+      font-weight: 700; border: none; transition: background .15s;
+    }
+    button:hover { background: var(--accent-2); }
+    button.secondary {
+      background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    }
+    button.secondary:hover { border-color: var(--accent); color: var(--accent); }
+    button.danger-btn { background: var(--danger); color: #fff; }
+    button.danger-btn:hover { background: #c03030; }
+    button.ok-btn { background: var(--ok); color: #fff; }
+    button.ok-btn:hover { background: #2e9050; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .small-actions { display: flex; gap: 6px; }
+
+    /* ── Inventory Overview (top) ── */
+    .inventory-bar { margin-bottom: 12px; }
+    .inventory-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+    }
+    .inventory-header strong { font-size: 14px; text-transform: uppercase; letter-spacing: .5px; }
+    .search-wrap { display: flex; align-items: center; gap: 10px; }
+    .search-wrap input { width: 220px; }
+    .inventory-cards {
+      display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px;
+      scroll-snap-type: x proximity;
+    }
+    .inv-card {
+      flex: 0 0 180px; background: var(--panel-2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px; cursor: pointer;
+      transition: border-color .15s, box-shadow .15s; scroll-snap-align: start;
+      position: relative;
+    }
+    .inv-card:hover { border-color: var(--accent); }
+    .inv-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(212,135,14,.2); }
+    .inv-card .part-name {
+      font-weight: 700; font-size: 12px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px;
+    }
+    .inv-card .part-id {
+      font-size: 10px; color: var(--text-dim); font-family: var(--mono);
+      margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .inv-card .count-big {
+      font-size: 28px; font-weight: 800; color: var(--accent); line-height: 1;
+      font-family: var(--mono);
+    }
+    .inv-card .dev-label {
+      font-size: 10px; color: var(--text-dim); margin-top: 6px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .inv-card .status-dot {
+      position: absolute; top: 10px; right: 10px; width: 8px; height: 8px;
+      border-radius: 50%;
+    }
+    .inv-card .status-dot.online { background: var(--ok); box-shadow: 0 0 6px rgba(59,165,93,.5); }
+    .inv-card .status-dot.stale  { background: var(--warn); }
+    .inv-card .status-dot.offline { background: var(--danger); }
+    .inv-empty { color: var(--text-dim); padding: 12px 0; font-size: 13px; }
+
+    /* ── Status Filter Buttons ── */
+    .status-filters { display: flex; gap: 4px; }
+    .status-filters button {
+      width: auto; padding: 4px 12px; font-size: 11px; font-weight: 600;
+      background: var(--surface); color: var(--text-dim); border: 1px solid var(--border);
+      text-transform: uppercase; letter-spacing: .5px; transition: all .15s;
+    }
+    .status-filters button.active { background: var(--accent); color: #000; border-color: var(--accent); }
+    .status-filters button[data-filter="online"].active { background: var(--ok); color: #fff; border-color: var(--ok); }
+    .status-filters button[data-filter="stale"].active { background: var(--warn); color: #000; border-color: var(--warn); }
+    .status-filters button[data-filter="offline"].active { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+    /* ── Inventory Fullscreen Overlay ── */
+    .inv-fs-overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: var(--bg); flex-direction: column; padding: 16px;
+      overflow: hidden;
+    }
+    .inv-fs-overlay.open { display: flex; }
+    .inv-fs-toolbar {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      margin-bottom: 12px; padding: 12px 16px;
+      background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    }
+    .inv-fs-toolbar .logo { font-size: 18px; }
+    .inv-fs-toolbar input { width: 240px; }
+    .inv-fs-stats {
+      display: flex; gap: 16px; margin-left: auto; align-items: center;
+    }
+    .inv-fs-stats .fs-stat {
+      text-align: center; padding: 0 8px;
+    }
+    .inv-fs-stats .fs-stat .val {
+      font-size: 20px; font-weight: 700; font-family: var(--mono); line-height: 1.1;
+    }
+    .inv-fs-stats .fs-stat .lbl {
+      font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .8px;
+    }
+    .inv-fs-grid {
+      flex: 1; overflow-y: auto; padding: 4px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px; align-content: start;
+    }
+    .inv-fs-grid .inv-card {
+      flex: none; width: auto; min-width: 0;
+    }
+    .inv-fs-grid .inv-card .count-big { font-size: 36px; }
+    .inv-fs-grid .inv-card .part-name { font-size: 14px; }
+    .inv-fs-grid .inv-card .dev-label { font-size: 11px; }
+
+    /* ── Main Grid ── */
+    .grid { display: grid; grid-template-columns: 300px 1fr; gap: 12px; }
+
+    /* ── Device Sidebar ── */
+    .devices { max-height: calc(100vh - 280px); overflow-y: auto; }
+    .devices-header {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 6px; margin-bottom: 8px;
+    }
+    .devices-header strong { font-size: 13px; text-transform: uppercase; letter-spacing: .5px; }
+    .device-row {
+      display: grid; grid-template-columns: 20px 1fr auto;
+      align-items: center; gap: 8px; padding: 8px;
+      border-bottom: 1px solid rgba(255,255,255,.04);
+      user-select: none; border-radius: 4px;
+    }
+    .device-row:hover { background: rgba(212,135,14,.04); }
+    .device-name {
+      font-weight: 600; font-size: 13px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+    .device-info-area { cursor: pointer; }
+    .badge {
+      font-size: 12px; padding: 3px 8px; border-radius: 4px; font-weight: 700;
+      font-family: var(--mono); white-space: nowrap;
+      background: rgba(59,165,93,.1); color: var(--ok); border: 1px solid rgba(59,165,93,.25);
+    }
+    .badge.stale { background: rgba(232,164,24,.1); color: var(--warn); border-color: rgba(232,164,24,.25); }
+    .dblclick-hint {
+      font-size: 10px; color: var(--text-dim); opacity: .4;
+      text-align: center; padding: 8px 0; border-top: 1px solid var(--border); margin-top: 4px;
+    }
+
+    /* ── Chart Panel ── */
+    .chart-panel { display: flex; flex-direction: column; }
+    .time-toolbar {
+      display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap;
+      margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border);
+    }
+    .time-toolbar .field { min-width: 0; }
+    .time-toolbar select { min-width: 120px; }
+    .time-toolbar input[type="datetime-local"] { min-width: 185px; }
+    .chart-status {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 10px; margin-bottom: 6px; flex-wrap: wrap;
+    }
+    .chart-status-left { display: flex; align-items: center; gap: 10px; }
+    .chart-status-right { display: flex; align-items: center; gap: 8px; }
+    .status-label {
+      font-size: 11px; text-transform: uppercase; letter-spacing: .6px;
+      padding: 3px 10px; border-radius: 4px; font-weight: 700;
+    }
+    .status-label.live { background: rgba(59,165,93,.15); color: var(--ok); }
+    .status-label.paused { background: rgba(232,164,24,.15); color: var(--warn); }
+    #chart { width: 100%; height: calc(100vh - 380px); min-height: 350px; }
+    .pause-btn { width: auto; padding: 6px 16px; font-size: 12px; min-width: 90px; }
+    .pause-btn.paused { background: var(--ok); color: #fff; }
+    .fullscreen-btn {
+      width: auto; padding: 6px 12px; font-size: 14px;
+      background: var(--surface); color: var(--text-dim); border: 1px solid var(--border);
+    }
+    .fullscreen-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* ── Fullscreen Overlay ── */
+    .fs-overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: var(--bg); flex-direction: column; padding: 12px;
+    }
+    .fs-overlay.open { display: flex; }
+    .fs-toolbar {
+      display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap;
+      margin-bottom: 8px; padding: 10px 14px;
+      background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    }
+    .fs-toolbar .field select, .fs-toolbar .field input { font-size: 13px; }
+    #fsChart { flex: 1; width: 100%; min-height: 0; }
+
+    /* ── Command Queue ── */
+    .cmd-queue-panel { margin-top: 12px; }
+    .cmd-queue-header {
+      display: flex; justify-content: space-between; align-items: center;
+      cursor: pointer; user-select: none;
+    }
+    .cmd-queue-header:hover strong { color: var(--accent); }
+    .cmd-queue-header strong { font-size: 13px; text-transform: uppercase; letter-spacing: .5px; }
+    .cmd-queue-toggle { font-size: 12px; color: var(--text-dim); }
+    .cmd-badge-count {
+      font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 700;
+      background: rgba(212,135,14,.15); color: var(--accent); margin-left: 8px;
+    }
+    .cmd-table-wrap { margin-top: 10px; overflow-x: auto; }
+    .cmd-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .cmd-table th {
+      text-align: left; padding: 8px 10px; font-size: 10px;
+      color: var(--text-dim); border-bottom: 1px solid var(--border);
+      text-transform: uppercase; letter-spacing: .6px;
+    }
+    .cmd-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,.03); }
+    .cmd-table tr:hover td { background: rgba(212,135,14,.03); }
+    .cmd-payload { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+    .cmd-type-badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600;
+      background: rgba(74,144,196,.1); color: var(--info); border: 1px solid rgba(74,144,196,.2);
+    }
+    .cancel-btn {
+      width: auto; padding: 3px 10px; font-size: 11px;
+      background: transparent; color: var(--danger); border: 1px solid rgba(212,64,64,.3);
+    }
+    .cancel-btn:hover { background: var(--danger); color: #fff; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.65); z-index: 100;
+      justify-content: center; align-items: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; width: 460px;
+      max-width: 95vw; max-height: 90vh; overflow-y: auto;
+    }
+    .modal h2 { font-size: 16px; margin-bottom: 2px; }
+    .modal .modal-subtitle {
+      font-size: 13px; color: var(--accent); font-family: var(--mono); margin-bottom: 16px;
+    }
+    .modal-section {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 14px; margin-bottom: 14px; background: var(--panel-2);
+    }
+    .modal-section h3 {
+      font-size: 12px; text-transform: uppercase; letter-spacing: .6px;
+      color: var(--text-dim); margin-bottom: 10px;
+    }
+    .stock-adjust { display: flex; align-items: flex-end; gap: 8px; }
+    .stock-adjust .current-count {
+      font-size: 28px; font-weight: 800; font-family: var(--mono); color: var(--accent);
+      min-width: 80px; text-align: center; line-height: 38px;
+    }
+    .stock-adjust input { width: 100px; text-align: center; font-family: var(--mono); font-size: 16px; }
+    .stock-adjust button { width: auto; padding: 8px 14px; font-size: 13px; }
+    .modal .field { margin-bottom: 12px; }
+    .modal .field label { display: block; margin-bottom: 3px; }
+    .modal-actions {
+      display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;
+    }
+    .modal-actions button { width: auto; padding: 8px 18px; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 20px; right: 20px; z-index: 300;
+      padding: 10px 18px; border-radius: var(--radius); font-size: 13px; font-weight: 600;
+      opacity: 0; transition: opacity .3s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+    .toast.success { background: var(--ok); color: #fff; }
+    .toast.error { background: var(--danger); color: #fff; }
+
+    /* ── Threshold Alert Indicators on Cards ── */
+    .inv-card.alert-warning {
+      border-color: var(--warn);
+      box-shadow: 0 0 0 2px rgba(232,164,24,.2), inset 0 0 0 1px rgba(232,164,24,.1);
+    }
+    .inv-card.alert-critical {
+      border-color: var(--danger);
+      box-shadow: 0 0 0 2px rgba(212,64,64,.25), inset 0 0 0 1px rgba(212,64,64,.15);
+      animation: pulse-critical 2s ease-in-out infinite;
+    }
+    @keyframes pulse-critical {
+      0%, 100% { box-shadow: 0 0 0 2px rgba(212,64,64,.25); }
+      50% { box-shadow: 0 0 0 4px rgba(212,64,64,.35); }
+    }
+    .inv-card .threshold-badge {
+      position: absolute; bottom: 10px; right: 10px;
+      font-size: 9px; font-weight: 800; letter-spacing: .5px;
+      padding: 2px 6px; border-radius: 3px; text-transform: uppercase;
+    }
+    .inv-card .threshold-badge.warn { background: rgba(232,164,24,.2); color: var(--warn); }
+    .inv-card .threshold-badge.crit { background: rgba(212,64,64,.2); color: var(--danger); }
+
+    /* ── Battery Indicator ── */
+    .inv-card .batt-row {
+      display: flex; align-items: center; gap: 4px; margin-top: 4px;
+    }
+    .batt-icon {
+      display: inline-flex; align-items: stretch;
+      width: 22px; height: 12px; border: 1.5px solid var(--text-dim);
+      border-radius: 2px; position: relative; font-size: 0;
+    }
+    .batt-icon::after {
+      content: ''; position: absolute; right: -4px; top: 2px;
+      width: 2px; height: 6px; background: var(--text-dim); border-radius: 0 1px 1px 0;
+    }
+    .batt-icon .batt-fill {
+      height: 100%; border-radius: 1px; transition: width .3s;
+    }
+    .batt-icon.ok .batt-fill { background: var(--ok); }
+    .batt-icon.warn .batt-fill { background: var(--warn); }
+    .batt-icon.crit .batt-fill { background: var(--danger); }
+    .batt-icon.warn { border-color: var(--warn); }
+    .batt-icon.warn::after { background: var(--warn); }
+    .batt-icon.crit { border-color: var(--danger); }
+    .batt-icon.crit::after { background: var(--danger); }
+    .batt-label {
+      font-size: 9px; font-family: var(--mono); color: var(--text-dim);
+    }
+    .batt-label.warn { color: var(--warn); font-weight: 700; }
+    .batt-label.crit { color: var(--danger); font-weight: 700; }
+
+    /* ── Alerts Panel ── */
+    .alerts-panel { margin-top: 12px; }
+    .alerts-header {
+      display: flex; justify-content: space-between; align-items: center;
+      cursor: pointer; user-select: none;
+    }
+    .alerts-header:hover strong { color: var(--danger); }
+    .alerts-header strong { font-size: 13px; text-transform: uppercase; letter-spacing: .5px; }
+    .alert-badge-count {
+      font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 700;
+      margin-left: 8px;
+    }
+    .alert-badge-count.has-critical { background: rgba(212,64,64,.2); color: var(--danger); }
+    .alert-badge-count.has-warning { background: rgba(232,164,24,.2); color: var(--warn); }
+    .alert-badge-count.clear { background: rgba(59,165,93,.15); color: var(--ok); }
+    .alert-row {
+      display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.03); font-size: 13px;
+    }
+    .alert-row:hover { background: rgba(212,64,64,.03); }
+    .alert-level-pip {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+    .alert-level-pip.critical { background: var(--danger); box-shadow: 0 0 6px rgba(212,64,64,.5); }
+    .alert-level-pip.warning { background: var(--warn); }
+    .alert-msg { flex: 1; }
+    .alert-time { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+    .alert-actions { display: flex; gap: 4px; }
+    .alert-actions button { width: auto; padding: 3px 8px; font-size: 10px; }
+
+    /* ── Header Alert Bell ── */
+    .header-alert-bell {
+      position: relative; font-size: 18px; cursor: pointer;
+      padding: 4px 8px; border-radius: 4px;
+      transition: background .15s;
+    }
+    .header-alert-bell:hover { background: rgba(212,64,64,.1); }
+    .header-alert-bell .bell-count {
+      position: absolute; top: -2px; right: -2px;
+      font-size: 9px; font-weight: 800; padding: 1px 5px;
+      border-radius: 10px; background: var(--danger); color: #fff;
+      line-height: 1.2;
+    }
+
+    /* ── Threshold section in modal ── */
+    .threshold-inputs { display: flex; gap: 10px; align-items: flex-end; }
+    .threshold-inputs .field { flex: 1; }
+    .threshold-inputs button { width: auto; padding: 8px 14px; font-size: 13px; }
+    .threshold-current {
+      font-size: 11px; color: var(--text-dim); margin-top: 6px;
+    }
+    .threshold-current span.warn-val { color: var(--warn); font-weight: 600; }
+    .threshold-current span.crit-val { color: var(--danger); font-weight: 600; }
+
+    /* ── Search highlight ── */
+    .hl { background: rgba(212,135,14,.3); border-radius: 2px; padding: 0 1px; }
+
+    /* ── Responsive ── */
+    @media (max-width: 980px) {
+      .grid { grid-template-columns: 1fr; }
+      .devices { max-height: 260px; }
+      #chart { height: 50vh; }
+      .header-stats { display: none; }
+      .time-toolbar { gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ─── Header ─── -->
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">STOCKNET <span>// Dashboard</span></div>
+      <a href="/bom" style="text-decoration:none;color:var(--text-dim);font-size:13px;padding:6px 12px;border-radius:var(--radius);border:1px solid var(--border);transition:all .15s;"
+         onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'"
+         onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border)'">BOM Manager</a>
+      <a href="/orders" style="text-decoration:none;color:var(--text-dim);font-size:13px;padding:6px 12px;border-radius:var(--radius);border:1px solid var(--border);transition:all .15s;"
+         onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'"
+         onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border)'">Orders</a>
+      <a href="/procurement" style="text-decoration:none;color:var(--text-dim);font-size:13px;padding:6px 12px;border-radius:var(--radius);border:1px solid var(--border);transition:all .15s;"
+         onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'"
+         onmouseout="this.style.color='var(--text-dim)';this.style.borderColor='var(--border)'">Procurement</a>
+    </div>
+    <div class="header-stats" id="headerStats">
+      <div class="header-stat"><div class="val" id="statTotal">--</div><div class="lbl">Total Units</div></div>
+      <div class="header-stat"><div class="val" id="statDevices">--</div><div class="lbl">Counters</div></div>
+      <div class="header-stat"><div class="val" id="statOnline" style="color:var(--ok)">--</div><div class="lbl">Online</div></div>
+      <div class="header-stat"><div class="val" id="statPending" style="color:var(--accent)">--</div><div class="lbl">Pending Cmds</div></div>
+      <div class="header-alert-bell" id="alertBell" title="Active alerts">
+        &#x1F514;<span class="bell-count" id="alertBellCount" style="display:none;">0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Inventory Overview ─── -->
+  <div class="panel inventory-bar">
+    <div class="inventory-header">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <strong>Inventory Overview</strong>
+        <div class="status-filters" id="statusFilters">
+          <button data-filter="all" class="active">All</button>
+          <button data-filter="online">Online</button>
+          <button data-filter="stale">Stale</button>
+          <button data-filter="offline">Offline</button>
+        </div>
+      </div>
+      <div class="search-wrap">
+        <span id="inventoryCount" style="font-size:12px; color:var(--text-dim);">--</span>
+        <input id="searchInput" type="text" placeholder="Search parts or devices..." />
+        <button id="invFullscreenBtn" class="fullscreen-btn" title="Fullscreen inventory">&#x26F6;</button>
+      </div>
+    </div>
+    <div class="inventory-cards" id="inventoryCards">
+      <div class="inv-empty">Loading inventory...</div>
+    </div>
+  </div>
+
+  <!-- ─── Main Grid ─── -->
+  <div class="grid">
+    <!-- Device sidebar -->
+    <div class="panel devices">
+      <div class="devices-header">
+        <strong>Counters</strong>
+        <div class="small-actions">
+          <button id="allOnBtn" class="secondary" style="padding:5px 8px; font-size:11px;">All</button>
+          <button id="allOffBtn" class="secondary" style="padding:5px 8px; font-size:11px;">None</button>
+        </div>
+      </div>
+      <div id="deviceList"></div>
+      <div class="dblclick-hint">Double-click a device to manage</div>
+    </div>
+
+    <!-- Chart Panel -->
+    <div class="panel chart-panel">
+      <div class="time-toolbar">
+        <div class="field">
+          <label>Range</label>
+          <select id="presetRange">
+            <option value="15m">15 min</option>
+            <option value="1h">1 hour</option>
+            <option value="3h">3 hours</option>
+            <option value="6h">6 hours</option>
+            <option value="24h" selected>24 hours</option>
+            <option value="7d">7 days</option>
+            <option value="30d">30 days</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Start</label>
+          <input id="startTime" type="datetime-local" step="1" />
+        </div>
+        <div class="field">
+          <label>End</label>
+          <input id="endTime" type="datetime-local" step="1" />
+        </div>
+        <div style="display:flex; align-items:flex-end; gap:6px; margin-left:auto;">
+          <button id="pauseBtn" class="secondary pause-btn">&#9646;&#9646; Pause</button>
+          <button id="fullscreenBtn" class="fullscreen-btn" title="Fullscreen chart">&#x26F6;</button>
+        </div>
+      </div>
+      <div class="chart-status">
+        <div class="chart-status-left">
+          <span class="status-label live" id="statusLabel">LIVE</span>
+          <span id="summaryText" style="font-size:12px; color:var(--text-dim);"></span>
+        </div>
+        <div class="chart-status-right">
+          <span id="timeRangeDisplay" style="font-size:11px; color:var(--text-dim); font-family:var(--mono);"></span>
+        </div>
+      </div>
+      <div id="chart"></div>
+    </div>
+  </div>
+
+  <!-- ─── Pending Command Queue ─── -->
+  <div class="panel cmd-queue-panel">
+    <div class="cmd-queue-header" id="cmdQueueToggle">
+      <div style="display:flex; align-items:center;">
+        <strong>Pending Commands</strong>
+        <span class="cmd-badge-count" id="cmdCount">0</span>
+      </div>
+      <span class="cmd-queue-toggle" id="cmdQueueArrow">&#9660; Show</span>
+    </div>
+    <div class="cmd-table-wrap" id="cmdQueueBody" style="display:none;">
+      <table class="cmd-table">
+        <thead><tr>
+          <th>Device</th><th>Command</th><th>Payload</th><th>Queued</th><th></th>
+        </tr></thead>
+        <tbody id="cmdQueueRows"></tbody>
+      </table>
+      <div id="cmdQueueEmpty" style="display:none; color:var(--text-dim); padding:14px 0; text-align:center; font-size:13px;">
+        No pending commands.
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Alerts Panel ─── -->
+  <div class="panel alerts-panel">
+    <div class="alerts-header" id="alertsToggle">
+      <div style="display:flex; align-items:center;">
+        <strong>Stock Alerts</strong>
+        <span class="alert-badge-count clear" id="alertCount">0</span>
+      </div>
+      <span class="cmd-queue-toggle" id="alertsArrow">&#9660; Show</span>
+    </div>
+    <div id="alertsBody" style="display:none;">
+      <div id="alertRows"></div>
+      <div id="alertsEmpty" style="display:none; color:var(--text-dim); padding:14px 0; text-align:center; font-size:13px;">
+        No active alerts — all stock levels OK.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Fullscreen Chart Overlay ─── -->
+<div class="fs-overlay" id="fsOverlay">
+  <div class="fs-toolbar">
+    <div class="field">
+      <label>Range</label>
+      <select id="fsPresetRange">
+        <option value="15m">15 min</option>
+        <option value="1h" selected>1 hour</option>
+        <option value="3h">3 hours</option>
+        <option value="6h">6 hours</option>
+        <option value="24h">24 hours</option>
+        <option value="7d">7 days</option>
+        <option value="30d">30 days</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Start</label>
+      <input id="fsStartTime" type="datetime-local" step="1" />
+    </div>
+    <div class="field">
+      <label>End</label>
+      <input id="fsEndTime" type="datetime-local" step="1" />
+    </div>
+    <div style="display:flex; align-items:flex-end; gap:6px; margin-left:auto;">
+      <span class="status-label live" id="fsStatusLabel">LIVE</span>
+      <button id="fsPauseBtn" class="secondary pause-btn">&#9646;&#9646; Pause</button>
+      <button id="fsCloseBtn" class="secondary" style="width:auto; padding:6px 14px; font-size:13px;">&#10005; Close</button>
+    </div>
+  </div>
+  <div id="fsChart"></div>
+</div>
+
+<!-- ─── Inventory Fullscreen Overlay ─── -->
+<div class="inv-fs-overlay" id="invFsOverlay">
+  <div class="inv-fs-toolbar">
+    <div class="logo">STOCKNET <span>// Dashboard</span></div>
+    <div class="status-filters" id="invFsStatusFilters">
+      <button data-filter="all" class="active">All</button>
+      <button data-filter="online">Online</button>
+      <button data-filter="stale">Stale</button>
+      <button data-filter="offline">Offline</button>
+    </div>
+    <input id="invFsSearch" type="text" placeholder="Search parts or devices..." />
+    <div class="inv-fs-stats">
+      <div class="fs-stat"><div class="val" id="invFsTotal">--</div><div class="lbl">Total Units</div></div>
+      <div class="fs-stat"><div class="val" id="invFsCount">--</div><div class="lbl">Parts</div></div>
+      <div class="fs-stat"><div class="val" id="invFsOnline" style="color:var(--ok)">--</div><div class="lbl">Online</div></div>
+    </div>
+    <button id="invFsCloseBtn" class="secondary" style="width:auto; padding:6px 14px; font-size:13px;">&#10005; Close</button>
+  </div>
+  <div class="inv-fs-grid" id="invFsGrid"></div>
+</div>
+
+<!-- ─── Command Modal ─── -->
+<div class="modal-overlay" id="cmdModal">
+  <div class="modal">
+    <h2>Device Management</h2>
+    <div class="modal-subtitle" id="modalSubtitle"></div>
+
+    <!-- Stock Adjustment -->
+    <div class="modal-section">
+      <h3>Quick Stock Adjust</h3>
+      <div class="stock-adjust">
+        <div>
+          <label>Current</label>
+          <div class="current-count" id="modalCurrentCount">--</div>
+        </div>
+        <div class="field" style="flex:1;">
+          <label>Quantity</label>
+          <input id="stockQty" type="number" min="1" value="1" />
+        </div>
+        <button class="ok-btn" id="addStockBtn" style="width:auto;">+ Add</button>
+        <button class="danger-btn" id="removeStockBtn" style="width:auto;">- Remove</button>
+      </div>
+    </div>
+
+    <!-- Threshold Settings -->
+    <div class="modal-section">
+      <h3>Stock Thresholds</h3>
+      <div class="threshold-inputs">
+        <div class="field">
+          <label style="color:var(--warn);">&#9888; Warning</label>
+          <input id="threshWarn" type="number" min="0" placeholder="e.g. 50" />
+        </div>
+        <div class="field">
+          <label style="color:var(--danger);">&#9888; Critical</label>
+          <input id="threshCrit" type="number" min="0" placeholder="e.g. 10" />
+        </div>
+        <button class="secondary" id="threshSaveBtn">Save</button>
+        <button class="secondary" id="threshClearBtn" style="color:var(--text-dim);">Clear</button>
+      </div>
+      <div class="threshold-current" id="threshCurrent"></div>
+    </div>
+
+    <!-- Full Command -->
+    <div class="modal-section">
+      <h3>Send Device Command</h3>
+      <div class="field">
+        <label>Command Type</label>
+        <select id="cmdType">
+          <option value="" disabled selected>Select command...</option>
+          <option value="set_devname">Set Device Name</option>
+          <option value="set_name">Set Part Name</option>
+          <option value="set_id">Set Part ID</option>
+          <option value="set_count">Set Count</option>
+          <option value="set_timeout">Set Display Timeout</option>
+          <option value="set_post_interval">Set POST Interval</option>
+          <option value="set_wifi">Set WiFi</option>
+          <option value="set_api_url">Set API URL</option>
+          <option value="display_on">Display On</option>
+          <option value="display_off">Display Off</option>
+          <option value="reset_count">Reset Count</option>
+        </select>
+      </div>
+      <div id="cmdPayloadFields"></div>
+      <div style="margin-top:10px;">
+        <button id="cmdSend" style="width:auto; padding:8px 18px;">Enqueue Command</button>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="secondary" id="cmdCancel">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Toast ─── -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════  STATE  ═══════════════════════════ */
+const S = {
+  devices: [],
+  selected: new Set(),
+  refreshTimer: null,
+  paused: false,
+  searchTerm: '',
+  inventory: [],
+  highlightedDevice: null,
+  pendingCmds: [],
+  cmdQueueOpen: false,
+  modalDevice: null,
+  fullscreen: false,
+  fsPaused: false,
+  fsTimer: null,
+  statusFilter: 'all',
+  invFullscreen: false,
+  invFsSearch: '',
+  invFsFilter: 'all',
+  alerts: [],
+  alertsOpen: false,
+};
+
+/* ═══════════════  COMMAND DEFINITIONS  ═════════════════════════ */
+const CMD = {
+  set_devname:       { label: 'Set Device Name',    fields: [{ key: 'device_name', label: 'New Device Name', type: 'text' }] },
+  set_name:          { label: 'Set Part Name',      fields: [{ key: 'part_name', label: 'Part Name', type: 'text' }] },
+  set_id:            { label: 'Set Part ID',        fields: [{ key: 'part_id', label: 'Part ID', type: 'text' }] },
+  set_count:         { label: 'Set Count',          fields: [{ key: 'count', label: 'Count', type: 'number' }] },
+  set_timeout:       { label: 'Set Display Timeout', fields: [{ key: 'display_timeout_sec', label: 'Timeout (sec, 3\u2013600)', type: 'number', min: 3, max: 600 }] },
+  set_post_interval: { label: 'Set POST Interval',  fields: [{ key: 'post_interval_sec', label: 'Interval (sec)', type: 'number', min: 1 }] },
+  set_wifi:          { label: 'Set WiFi',           fields: [{ key: 'wifi_ssid', label: 'SSID', type: 'text' }, { key: 'wifi_pass', label: 'Password', type: 'text' }] },
+  set_api_url:       { label: 'Set API URL',        fields: [{ key: 'api_url', label: 'URL', type: 'text' }] },
+  display_on:        { label: 'Display On',         fields: [] },
+  display_off:       { label: 'Display Off',        fields: [] },
+  reset_count:       { label: 'Reset Count',        fields: [] },
+};
+
+/* ═══════════════════════  HELPERS  ═════════════════════════════ */
+function $(id) { return document.getElementById(id); }
+function isoLocal(dt) {
+  const p = n => String(n).padStart(2, '0');
+  return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())}T${p(dt.getHours())}:${p(dt.getMinutes())}:${p(dt.getSeconds())}`;
+}
+function presetToRange(preset) {
+  const end = new Date(), start = new Date(end);
+  const m = { '15m': [0,15], '1h': [1,0], '3h': [3,0], '6h': [6,0], '24h': [24,0] };
+  if (m[preset]) { start.setHours(start.getHours()-m[preset][0]); start.setMinutes(start.getMinutes()-m[preset][1]); }
+  else if (preset === '7d') start.setDate(start.getDate()-7);
+  else if (preset === '30d') start.setDate(start.getDate()-30);
+  return { start, end };
+}
+function syncRangeInputs(presetId, startId, endId) {
+  const v = $(presetId).value;
+  if (v === 'custom') return;
+  const { start, end } = presetToRange(v);
+  $(startId).value = isoLocal(start);
+  $(endId).value = isoLocal(end);
+}
+function advanceWindow(startId, endId) {
+  const sEl = $(startId), eEl = $(endId);
+  const s = new Date(sEl.value), e = new Date(eEl.value);
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return;
+  s.setSeconds(s.getSeconds() + 1);
+  e.setSeconds(e.getSeconds() + 1);
+  sEl.value = isoLocal(s);
+  eEl.value = isoLocal(e);
+}
+function escRx(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function hl(t) {
+  if (!S.searchTerm || !t) return t || '';
+  return t.replace(new RegExp(`(${escRx(S.searchTerm)})`, 'gi'), '<span class="hl">$1</span>');
+}
+function relTime(iso) {
+  if (!iso) return 'never';
+  const d = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (d < 60) return `${Math.round(d)}s ago`;
+  if (d < 3600) return `${Math.round(d / 60)}m ago`;
+  if (d < 86400) return `${Math.round(d / 3600)}h ago`;
+  return `${Math.round(d / 86400)}d ago`;
+}
+function isOnline(iso) { return iso && (Date.now() - new Date(iso).getTime()) < 3600000; }
+function isStale(iso) { return iso && !isOnline(iso) && (Date.now() - new Date(iso).getTime()) < 7200000; }
+function matchSearch(d, term) {
+  const q = term !== undefined ? term : S.searchTerm;
+  if (!q) return true;
+  return (d.device_name || '').toLowerCase().includes(q)
+      || (d.part_name || d.reported_part_name || '').toLowerCase().includes(q)
+      || (d.part_id || d.reported_part_id || '').toLowerCase().includes(q);
+}
+function deviceStatus(iso) {
+  if (isOnline(iso)) return 'online';
+  if (isStale(iso)) return 'stale';
+  return 'offline';
+}
+function matchStatusFilter(d, filter) {
+  if (filter === 'all') return true;
+  return deviceStatus(d.last_seen_at) === filter;
+}
+function fmtRange(s, e) {
+  if (!s || !e) return '';
+  const o = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+  return `${new Date(s).toLocaleString(undefined, o)} \u2014 ${new Date(e).toLocaleString(undefined, o)}`;
+}
+function toast(msg, type) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = `toast show ${type}`;
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+function thresholdLevel(item) {
+  const cnt = item.count;
+  if (cnt == null) return null;
+  if (item.critical_threshold != null && cnt <= item.critical_threshold) return 'critical';
+  if (item.warning_threshold != null && cnt <= item.warning_threshold) return 'warning';
+  return null;
+}
+function batteryHtml(voltage) {
+  if (voltage == null) return '';
+  const pct = Math.max(0, Math.min(100, ((voltage - 3.0) / (4.2 - 3.0)) * 100));
+  const cls = voltage <= 3.2 ? 'crit' : voltage <= 3.4 ? 'warn' : 'ok';
+  return `<div class="batt-row">` +
+    `<span class="batt-icon ${cls}"><span class="batt-fill" style="width:${pct}%"></span></span>` +
+    `<span class="batt-label ${cls}">${voltage.toFixed(2)}V</span>` +
+    `</div>`;
+}
+function deviceCount(name) {
+  const d = S.devices.find(x => x.device_name === name);
+  return d && d.latest_count != null ? d.latest_count : null;
+}
+
+/* ═══════════════════════  FETCH  ═══════════════════════════════ */
+async function fetchDevices() {
+  try {
+    const r = await fetch('/api/devices'), d = await r.json();
+    S.devices = d.devices || [];
+    if (!S.selected.size) S.devices.forEach(x => S.selected.add(x.device_name));
+    else {
+      const a = new Set(S.devices.map(x => x.device_name));
+      [...S.selected].forEach(n => { if (!a.has(n)) S.selected.delete(n); });
+    }
+    renderDeviceList();
+  } catch (e) { console.error('fetchDevices:', e); }
+}
+async function fetchInventory() {
+  try {
+    const r = await fetch('/api/inventory'), d = await r.json();
+    S.inventory = d.items || [];
+    renderInventoryCards();
+  } catch (e) { console.error('fetchInventory:', e); }
+}
+async function fetchPending() {
+  try {
+    const r = await fetch('/api/commands/pending'), d = await r.json();
+    S.pendingCmds = d.commands || [];
+    renderCmdQueue();
+  } catch (e) { console.error('fetchPending:', e); }
+}
+async function fetchAlerts() {
+  try {
+    const r = await fetch('/api/alerts'), d = await r.json();
+    S.alerts = d.alerts || [];
+    renderAlerts();
+  } catch (e) { console.error('fetchAlerts:', e); }
+}
+
+/* ═══════════════  HEADER STATS  ═══════════════════════════════ */
+function updateHeaderStats() {
+  const total = S.inventory.reduce((s, i) => s + (i.count ?? 0), 0);
+  const online = S.devices.filter(d => isOnline(d.last_seen_at)).length;
+  $('statTotal').textContent = total.toLocaleString();
+  $('statDevices').textContent = S.devices.length;
+  $('statOnline').textContent = online;
+  $('statPending').textContent = S.pendingCmds.length;
+  // Alert bell
+  const bellEl = $('alertBellCount');
+  const ac = S.alerts.length;
+  if (ac > 0) {
+    bellEl.textContent = ac;
+    bellEl.style.display = '';
+  } else {
+    bellEl.style.display = 'none';
+  }
+}
+
+/* ═══════════════  INVENTORY CARDS  ════════════════════════════ */
+function renderInventoryCards() {
+  const c = $('inventoryCards'), cnt = $('inventoryCount');
+  let items = S.inventory;
+  if (S.statusFilter !== 'all') items = items.filter(i => matchStatusFilter(i, S.statusFilter));
+  if (S.searchTerm) items = items.filter(i => matchSearch(i));
+  const tot = items.reduce((s, i) => s + (i.count ?? 0), 0);
+  cnt.textContent = `${items.length} part${items.length !== 1 ? 's' : ''} \u00b7 ${tot.toLocaleString()} units`;
+  if (!items.length) { c.innerHTML = '<div class="inv-empty">No items match.</div>'; return; }
+  c.innerHTML = items.map(i => {
+    const on = isOnline(i.last_seen_at), st = isStale(i.last_seen_at);
+    const dotCls = on ? 'online' : st ? 'stale' : 'offline';
+    const tLevel = thresholdLevel(i);
+    const alertCls = tLevel === 'critical' ? ' alert-critical' : tLevel === 'warning' ? ' alert-warning' : '';
+    const tBadge = tLevel === 'critical' ? '<span class="threshold-badge crit">LOW</span>'
+      : tLevel === 'warning' ? '<span class="threshold-badge warn">LOW</span>' : '';
+    return `<div class="inv-card${alertCls} ${S.highlightedDevice === i.device_name ? 'active' : ''}" data-device="${i.device_name}">
+      <div class="status-dot ${dotCls}"></div>
+      <div class="part-name" title="${i.part_name || 'Unknown'}">${hl(i.part_name || 'Unknown')}</div>
+      <div class="part-id">${hl(i.part_id || '--')}</div>
+      <div class="count-big">${i.count != null ? Number(i.count).toLocaleString() : '--'}</div>
+      <div class="dev-label">${hl(i.device_name)} \u00b7 ${relTime(i.last_seen_at)}</div>
+      ${batteryHtml(i.battery_voltage)}
+      ${tBadge}
+    </div>`;
+  }).join('');
+  c.querySelectorAll('.inv-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const n = card.dataset.device;
+      S.highlightedDevice = S.highlightedDevice === n ? null : n;
+      if (S.highlightedDevice) S.selected.add(n);
+      renderDeviceList(); renderInventoryCards(); refreshChart();
+    });
+  });
+}
+
+/* ═══════════════  DEVICE LIST  ════════════════════════════════ */
+function renderDeviceList() {
+  const el = $('deviceList');
+  let devs = S.devices;
+  if (S.searchTerm) devs = devs.filter(d => matchSearch({ device_name: d.device_name, part_name: d.reported_part_name, part_id: d.reported_part_id }));
+  if (!devs.length) { el.innerHTML = '<div style="color:var(--text-dim);padding:8px 0;">No devices match.</div>'; return; }
+  el.innerHTML = devs.map(d => {
+    const on = isOnline(d.last_seen_at), st = isStale(d.last_seen_at);
+    const badgeCls = on ? '' : 'stale';
+    return `<div class="device-row" data-device="${d.device_name}">
+      <input type="checkbox" data-device="${d.device_name}" ${S.selected.has(d.device_name) ? 'checked' : ''}>
+      <div class="device-info-area" data-device="${d.device_name}">
+        <div class="device-name">${hl(d.device_name)}</div>
+        <div style="font-size:11px;color:var(--text-dim);">${hl(d.reported_part_name || '')} \u00b7 ${relTime(d.last_seen_at)}</div>
+      </div>
+      <span class="badge ${badgeCls}">${d.latest_count != null ? Number(d.latest_count).toLocaleString() : '--'}</span>
+    </div>`;
+  }).join('');
+
+  // Checkbox: click toggles trace, does NOT trigger double-click on row
+  el.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('click', e => e.stopPropagation());
+    cb.addEventListener('change', e => {
+      const n = e.target.dataset.device;
+      if (e.target.checked) S.selected.add(n); else S.selected.delete(n);
+      refreshChart();
+    });
+  });
+
+  // Double-click on info area (not checkbox) opens modal
+  el.querySelectorAll('.device-info-area').forEach(area => {
+    area.addEventListener('dblclick', e => {
+      e.preventDefault();
+      openModal(area.dataset.device);
+    });
+  });
+}
+
+/* ═══════════════  CHART  ══════════════════════════════════════ */
+const CHART_LAYOUT = {
+  paper_bgcolor: '#1b1e24', plot_bgcolor: '#1b1e24',
+  font: { color: '#d8dce3', size: 11, family: 'Inter, system-ui, sans-serif' },
+  margin: { l: 50, r: 16, t: 16, b: 40 },
+  xaxis: { title: '', gridcolor: '#33393f', linecolor: '#33393f' },
+  yaxis: { title: 'Count', gridcolor: '#33393f', linecolor: '#33393f', rangemode: 'tozero' },
+  legend: { orientation: 'h', y: 1.08, font: { size: 11 } },
+  hovermode: 'x unified',
+};
+const CHART_CFG = { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['lasso2d', 'select2d'] };
+
+async function fetchTraces(startVal, endVal) {
+  let selected = [...S.selected];
+  if (S.searchTerm) {
+    const m = new Set(S.devices.filter(d => matchSearch({ device_name: d.device_name, part_name: d.reported_part_name, part_id: d.reported_part_id })).map(d => d.device_name));
+    selected = selected.filter(n => m.has(n));
+  }
+  const p = new URLSearchParams();
+  if (startVal) p.set('start', new Date(startVal).toISOString());
+  if (endVal) p.set('end', new Date(endVal).toISOString());
+  p.set('max_points', '600');
+  selected.forEach(n => p.append('device_name', n));
+  const r = await fetch(`/api/timeseries?${p}`);
+  const data = await r.json();
+  const traces = (data.series || []).map(s => {
+    const hi = S.highlightedDevice === s.device_name;
+    return {
+      x: s.points.map(pt => pt.t), y: s.points.map(pt => pt.v),
+      type: 'scattergl', mode: 'lines+markers', name: s.device_name,
+      hovertemplate: '%{x}<br>%{y}<extra>%{fullData.name}</extra>',
+      connectgaps: false,
+      opacity: S.highlightedDevice ? (hi ? 1 : .15) : 1,
+      line: { width: hi ? 3 : 2 }, marker: { size: hi ? 9 : 5 },
+    };
+  });
+  if (S.highlightedDevice) traces.sort((a, b) => (a.name === S.highlightedDevice ? 1 : 0) - (b.name === S.highlightedDevice ? 1 : 0));
+  return { traces, count: selected.length, traceCount: traces.length };
+}
+
+async function refreshChart() {
+  const start = $('startTime').value, end = $('endTime').value;
+  $('timeRangeDisplay').textContent = fmtRange(start, end);
+  try {
+    const { traces, count, traceCount } = await fetchTraces(start, end);
+    Plotly.react('chart', traces, CHART_LAYOUT, CHART_CFG);
+    $('summaryText').textContent = `${count} selected \u00b7 ${traceCount} trace${traceCount !== 1 ? 's' : ''}`;
+  } catch (e) { console.error('refreshChart:', e); }
+}
+
+async function refreshFsChart() {
+  const start = $('fsStartTime').value, end = $('fsEndTime').value;
+  try {
+    const { traces } = await fetchTraces(start, end);
+    Plotly.react('fsChart', traces, { ...CHART_LAYOUT }, CHART_CFG);
+  } catch (e) { console.error('refreshFsChart:', e); }
+}
+
+/* ═══════════════  COMMAND QUEUE  ══════════════════════════════ */
+function renderCmdQueue() {
+  const tbody = $('cmdQueueRows'), empty = $('cmdQueueEmpty');
+  $('cmdCount').textContent = S.pendingCmds.length;
+  if (!S.pendingCmds.length) { tbody.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  tbody.innerHTML = S.pendingCmds.map(c => {
+    const def = CMD[c.command_type];
+    const pl = c.payload && Object.keys(c.payload).length
+      ? Object.entries(c.payload).map(([k, v]) => `${k}: ${v}`).join(', ') : '\u2014';
+    const when = c.created_at ? new Date(c.created_at).toLocaleString(undefined, {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+    }) : '--';
+    return `<tr>
+      <td style="font-weight:600;font-family:var(--mono);font-size:12px;">${c.device_name}</td>
+      <td><span class="cmd-type-badge">${def ? def.label : c.command_type}</span></td>
+      <td class="cmd-payload">${pl}</td>
+      <td style="color:var(--text-dim);font-size:11px;white-space:nowrap;">${when}</td>
+      <td><button class="cancel-btn" data-cmdid="${c.command_id}">Cancel</button></td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('.cancel-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        const r = await fetch('/api/device/commands/ack', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ command_id: btn.dataset.cmdid, status: 'cancelled', result_message: 'Cancelled from dashboard' }),
+        });
+        const d = await r.json();
+        if (d.ok) { toast('Command cancelled', 'success'); await fetchPending(); }
+        else toast(d.error || 'Failed', 'error');
+      } catch (e) { toast('Network error', 'error'); }
+    });
+  });
+}
+
+/* ═══════════════  ALERTS PANEL  ══════════════════════════════ */
+function renderAlerts() {
+  const rows = $('alertRows'), empty = $('alertsEmpty'), badge = $('alertCount');
+  const hasCrit = S.alerts.some(a => a.alert_level === 'critical');
+  badge.textContent = S.alerts.length;
+  badge.className = 'alert-badge-count ' + (S.alerts.length === 0 ? 'clear' : hasCrit ? 'has-critical' : 'has-warning');
+
+  if (!S.alerts.length) { rows.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  rows.innerHTML = S.alerts.map(a => {
+    const when = a.created_at ? new Date(a.created_at).toLocaleString(undefined, {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+    }) : '--';
+    const ackBtn = a.status === 'open'
+      ? `<button class="secondary ack-alert-btn" data-id="${a.alert_id}">Ack</button>` : '';
+    return `<div class="alert-row">
+      <div class="alert-level-pip ${a.alert_level}"></div>
+      <div class="alert-msg">
+        <span style="font-weight:600;font-family:var(--mono);font-size:12px;">${a.device_name || '--'}</span>
+        <span style="color:var(--text-dim);margin-left:6px;">${a.message}</span>
+      </div>
+      <span class="alert-time">${when}</span>
+      <div class="alert-actions">
+        ${ackBtn}
+        <button class="cancel-btn clear-alert-btn" data-id="${a.alert_id}">Clear</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  rows.querySelectorAll('.ack-alert-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        const r = await fetch('/api/alerts/acknowledge', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ alert_id: btn.dataset.id }),
+        });
+        const d = await r.json();
+        if (d.ok) { toast('Alert acknowledged', 'success'); await fetchAlerts(); updateHeaderStats(); }
+        else toast(d.error || 'Failed', 'error');
+      } catch (e) { toast('Network error', 'error'); }
+    });
+  });
+
+  rows.querySelectorAll('.clear-alert-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        const r = await fetch('/api/alerts/clear', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ alert_id: btn.dataset.id }),
+        });
+        const d = await r.json();
+        if (d.ok) { toast('Alert cleared', 'success'); await fetchAlerts(); updateHeaderStats(); }
+        else toast(d.error || 'Failed', 'error');
+      } catch (e) { toast('Network error', 'error'); }
+    });
+  });
+}
+
+$('alertsToggle').addEventListener('click', () => {
+  S.alertsOpen = !S.alertsOpen;
+  $('alertsBody').style.display = S.alertsOpen ? 'block' : 'none';
+  $('alertsArrow').innerHTML = S.alertsOpen ? '&#9650; Hide' : '&#9660; Show';
+});
+
+$('alertBell').addEventListener('click', () => {
+  if (!S.alertsOpen) {
+    S.alertsOpen = true;
+    $('alertsBody').style.display = 'block';
+    $('alertsArrow').innerHTML = '&#9650; Hide';
+  }
+  $('alertsToggle').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+/* ═══════════════  MODAL  ══════════════════════════════════════ */
+function openModal(name) {
+  S.modalDevice = name;
+  $('modalSubtitle').textContent = name;
+  const cnt = deviceCount(name);
+  $('modalCurrentCount').textContent = cnt != null ? Number(cnt).toLocaleString() : '--';
+  $('stockQty').value = '1';
+  $('cmdType').value = '';
+  $('cmdPayloadFields').innerHTML = '';
+  // Populate threshold inputs
+  const dev = S.devices.find(d => d.device_name === name);
+  $('threshWarn').value = dev && dev.warning_threshold != null ? dev.warning_threshold : '';
+  $('threshCrit').value = dev && dev.critical_threshold != null ? dev.critical_threshold : '';
+  const parts = [];
+  if (dev && dev.warning_threshold != null) parts.push(`Warning: <span class="warn-val">${dev.warning_threshold}</span>`);
+  if (dev && dev.critical_threshold != null) parts.push(`Critical: <span class="crit-val">${dev.critical_threshold}</span>`);
+  $('threshCurrent').innerHTML = parts.length ? `Current: ${parts.join(' · ')}` : 'No thresholds set';
+  $('cmdModal').classList.add('open');
+}
+function closeModal() { $('cmdModal').classList.remove('open'); S.modalDevice = null; }
+
+async function enqueueCmd(deviceName, cmdType, payload) {
+  const r = await fetch('/api/device/commands/enqueue', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ device_name: deviceName, command_type: cmdType, payload }),
+  });
+  return await r.json();
+}
+
+// Add Stock
+$('addStockBtn').addEventListener('click', async () => {
+  const name = S.modalDevice;
+  if (!name) return;
+  const cnt = deviceCount(name);
+  if (cnt == null) { toast('No current count available', 'error'); return; }
+  const qty = parseInt($('stockQty').value);
+  if (!qty || qty < 0) { toast('Enter a valid quantity', 'error'); return; }
+  try {
+    const d = await enqueueCmd(name, 'set_count', { count: cnt + qty });
+    if (d.ok) { toast(`+${qty} queued for ${name} (new: ${cnt + qty})`, 'success'); await fetchPending(); updateHeaderStats(); }
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Network error', 'error'); }
+});
+
+// Remove Stock
+$('removeStockBtn').addEventListener('click', async () => {
+  const name = S.modalDevice;
+  if (!name) return;
+  const cnt = deviceCount(name);
+  if (cnt == null) { toast('No current count available', 'error'); return; }
+  const qty = parseInt($('stockQty').value);
+  if (!qty || qty < 0) { toast('Enter a valid quantity', 'error'); return; }
+  const newCnt = Math.max(0, cnt - qty);
+  try {
+    const d = await enqueueCmd(name, 'set_count', { count: newCnt });
+    if (d.ok) { toast(`-${qty} queued for ${name} (new: ${newCnt})`, 'success'); await fetchPending(); updateHeaderStats(); }
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Network error', 'error'); }
+});
+
+// Command type change -> dynamic fields
+$('cmdType').addEventListener('change', e => {
+  const def = CMD[e.target.value], c = $('cmdPayloadFields');
+  if (!def || !def.fields.length) {
+    c.innerHTML = def ? '<div style="color:var(--text-dim);font-size:12px;padding:6px 0;">No parameters needed.</div>' : '';
+    return;
+  }
+  c.innerHTML = def.fields.map(f => `<div class="field">
+    <label>${f.label}</label>
+    <input id="cmd_field_${f.key}" type="${f.type}" ${f.min != null ? `min="${f.min}"` : ''} ${f.max != null ? `max="${f.max}"` : ''} />
+  </div>`).join('');
+});
+
+// Send command
+$('cmdSend').addEventListener('click', async () => {
+  const name = S.modalDevice, ct = $('cmdType').value;
+  if (!ct) { toast('Select a command', 'error'); return; }
+  const def = CMD[ct], payload = {};
+  for (const f of (def.fields || [])) {
+    const el = $(`cmd_field_${f.key}`);
+    if (!el) continue;
+    let v = el.value.trim();
+    if (!v) { toast(`${f.label} is required`, 'error'); return; }
+    if (f.type === 'number') {
+      v = Number(v);
+      if (isNaN(v)) { toast(`${f.label} must be a number`, 'error'); return; }
+      if (f.min != null && v < f.min) { toast(`${f.label} min is ${f.min}`, 'error'); return; }
+      if (f.max != null && v > f.max) { toast(`${f.label} max is ${f.max}`, 'error'); return; }
+    }
+    payload[f.key] = v;
+  }
+  try {
+    const d = await enqueueCmd(name, ct, payload);
+    if (d.ok) { toast(`Command queued for ${name}`, 'success'); closeModal(); await fetchPending(); updateHeaderStats(); }
+    else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Network error', 'error'); }
+});
+
+$('cmdCancel').addEventListener('click', closeModal);
+$('cmdModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+
+// Save thresholds
+$('threshSaveBtn').addEventListener('click', async () => {
+  const name = S.modalDevice;
+  if (!name) return;
+  const warnVal = $('threshWarn').value.trim();
+  const critVal = $('threshCrit').value.trim();
+  const warn = warnVal !== '' ? parseInt(warnVal) : null;
+  const crit = critVal !== '' ? parseInt(critVal) : null;
+  if (warn !== null && crit !== null && crit > warn) {
+    toast('Critical must be \u2264 Warning', 'error'); return;
+  }
+  try {
+    const r = await fetch('/api/device/thresholds', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_name: name, warning_threshold: warn, critical_threshold: crit }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      toast(`Thresholds saved for ${name}`, 'success');
+      await Promise.all([fetchDevices(), fetchInventory(), fetchAlerts()]);
+      updateHeaderStats();
+      // Update display
+      const parts = [];
+      if (warn != null) parts.push(`Warning: <span class="warn-val">${warn}</span>`);
+      if (crit != null) parts.push(`Critical: <span class="crit-val">${crit}</span>`);
+      $('threshCurrent').innerHTML = parts.length ? `Current: ${parts.join(' \u00b7 ')}` : 'No thresholds set';
+    } else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Network error', 'error'); }
+});
+
+// Clear thresholds
+$('threshClearBtn').addEventListener('click', async () => {
+  const name = S.modalDevice;
+  if (!name) return;
+  try {
+    const r = await fetch('/api/device/thresholds', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device_name: name, warning_threshold: null, critical_threshold: null }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      toast(`Thresholds cleared for ${name}`, 'success');
+      $('threshWarn').value = ''; $('threshCrit').value = '';
+      $('threshCurrent').innerHTML = 'No thresholds set';
+      await Promise.all([fetchDevices(), fetchInventory(), fetchAlerts()]);
+      updateHeaderStats();
+    } else toast(d.error || 'Failed', 'error');
+  } catch (e) { toast('Network error', 'error'); }
+});
+
+/* ═══════════════  FULLSCREEN CHART  ══════════════════════════ */
+function openFullscreen() {
+  S.fullscreen = true;
+  $('fsPresetRange').value = $('presetRange').value;
+  $('fsStartTime').value = $('startTime').value;
+  $('fsEndTime').value = $('endTime').value;
+  S.fsPaused = S.paused;
+  updateFsPauseBtn();
+  $('fsOverlay').classList.add('open');
+  refreshFsChart();
+  startFsTimer();
+}
+function closeFullscreen() {
+  S.fullscreen = false;
+  $('fsOverlay').classList.remove('open');
+  if (S.fsTimer) { clearInterval(S.fsTimer); S.fsTimer = null; }
+  $('presetRange').value = $('fsPresetRange').value;
+  $('startTime').value = $('fsStartTime').value;
+  $('endTime').value = $('fsEndTime').value;
+}
+function startFsTimer() {
+  if (S.fsTimer) clearInterval(S.fsTimer);
+  S.fsTimer = null;
+  if (S.fsPaused) return;
+  S.fsTimer = setInterval(() => {
+    if (S.fsPaused) return;
+    advanceWindow('fsStartTime', 'fsEndTime');
+    refreshFsChart();
+  }, 1000);
+}
+function updateFsPauseBtn() {
+  const btn = $('fsPauseBtn'), lbl = $('fsStatusLabel');
+  if (S.fsPaused) {
+    btn.classList.add('paused'); btn.innerHTML = '&#9654; Resume';
+    lbl.className = 'status-label paused'; lbl.textContent = 'PAUSED';
+  } else {
+    btn.classList.remove('paused'); btn.innerHTML = '&#9646;&#9646; Pause';
+    lbl.className = 'status-label live'; lbl.textContent = 'LIVE';
+  }
+}
+
+$('fullscreenBtn').addEventListener('click', openFullscreen);
+$('fsCloseBtn').addEventListener('click', closeFullscreen);
+$('fsPauseBtn').addEventListener('click', () => {
+  S.fsPaused = !S.fsPaused;
+  updateFsPauseBtn();
+  if (S.fsPaused) { if (S.fsTimer) clearInterval(S.fsTimer); S.fsTimer = null; }
+  else startFsTimer();
+});
+$('fsPresetRange').addEventListener('change', () => syncRangeInputs('fsPresetRange', 'fsStartTime', 'fsEndTime'));
+$('fsStartTime').addEventListener('input', () => { $('fsPresetRange').value = 'custom'; });
+$('fsEndTime').addEventListener('input', () => { $('fsPresetRange').value = 'custom'; });
+
+/* ═══════════════  INVENTORY FULLSCREEN  ══════════════════════ */
+function openInvFullscreen() {
+  S.invFullscreen = true;
+  S.invFsSearch = S.searchTerm;
+  S.invFsFilter = S.statusFilter;
+  $('invFsSearch').value = $('searchInput').value;
+  syncInvFsFilterBtns();
+  $('invFsOverlay').classList.add('open');
+  renderInvFsGrid();
+}
+function closeInvFullscreen() {
+  S.invFullscreen = false;
+  $('invFsOverlay').classList.remove('open');
+}
+function syncInvFsFilterBtns() {
+  $('invFsStatusFilters').querySelectorAll('button').forEach(b => {
+    b.classList.toggle('active', b.dataset.filter === S.invFsFilter);
+  });
+}
+function renderInvFsGrid() {
+  const grid = $('invFsGrid');
+  let items = S.inventory;
+  if (S.invFsFilter !== 'all') items = items.filter(i => matchStatusFilter(i, S.invFsFilter));
+  if (S.invFsSearch) items = items.filter(i => matchSearch(i, S.invFsSearch));
+
+  const tot = items.reduce((s, i) => s + (i.count ?? 0), 0);
+  const onCount = items.filter(i => isOnline(i.last_seen_at)).length;
+  $('invFsTotal').textContent = tot.toLocaleString();
+  $('invFsCount').textContent = items.length;
+  $('invFsOnline').textContent = onCount;
+
+  if (!items.length) { grid.innerHTML = '<div class="inv-empty" style="grid-column:1/-1;">No items match.</div>'; return; }
+  const term = S.invFsSearch;
+  const hlFs = (t) => {
+    if (!term || !t) return t || '';
+    return t.replace(new RegExp(`(${escRx(term)})`, 'gi'), '<span class="hl">$1</span>');
+  };
+  grid.innerHTML = items.map(i => {
+    const dotCls = deviceStatus(i.last_seen_at);
+    const tLevel = thresholdLevel(i);
+    const alertCls = tLevel === 'critical' ? ' alert-critical' : tLevel === 'warning' ? ' alert-warning' : '';
+    const tBadge = tLevel === 'critical' ? '<span class="threshold-badge crit">LOW</span>'
+      : tLevel === 'warning' ? '<span class="threshold-badge warn">LOW</span>' : '';
+    return `<div class="inv-card${alertCls}" data-device="${i.device_name}">
+      <div class="status-dot ${dotCls}"></div>
+      <div class="part-name" title="${i.part_name || 'Unknown'}">${hlFs(i.part_name || 'Unknown')}</div>
+      <div class="part-id">${hlFs(i.part_id || '--')}</div>
+      <div class="count-big">${i.count != null ? Number(i.count).toLocaleString() : '--'}</div>
+      <div class="dev-label">${hlFs(i.device_name)} · ${relTime(i.last_seen_at)}</div>
+      ${batteryHtml(i.battery_voltage)}
+      ${tBadge}
+    </div>`;
+  }).join('');
+}
+
+$('invFullscreenBtn').addEventListener('click', openInvFullscreen);
+$('invFsCloseBtn').addEventListener('click', closeInvFullscreen);
+
+// Inventory fullscreen filter buttons
+$('invFsStatusFilters').querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    S.invFsFilter = btn.dataset.filter;
+    syncInvFsFilterBtns();
+    renderInvFsGrid();
+  });
+});
+
+// Inventory fullscreen search
+let invFsSearchTO = null;
+$('invFsSearch').addEventListener('input', e => {
+  clearTimeout(invFsSearchTO);
+  invFsSearchTO = setTimeout(() => {
+    S.invFsSearch = e.target.value.trim().toLowerCase();
+    renderInvFsGrid();
+  }, 200);
+});
+
+// Main inventory status filter buttons
+$('statusFilters').querySelectorAll('button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    S.statusFilter = btn.dataset.filter;
+    $('statusFilters').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.filter === S.statusFilter));
+    renderInventoryCards();
+  });
+});
+
+/* ═══════════════  MAIN REFRESH LOOP  ═════════════════════════ */
+function startMainLoop() {
+  if (S.refreshTimer) clearInterval(S.refreshTimer);
+  S.refreshTimer = null;
+  if (S.paused) return;
+  S.refreshTimer = setInterval(async () => {
+    if (S.paused) return;
+    advanceWindow('startTime', 'endTime');
+    await Promise.all([fetchDevices(), fetchInventory(), fetchPending(), fetchAlerts()]);
+    updateHeaderStats();
+    if (S.invFullscreen) renderInvFsGrid();
+    await refreshChart();
+  }, 1000);
+}
+
+/* ═══════════════  EVENT HANDLERS  ═════════════════════════════ */
+$('presetRange').addEventListener('change', () => syncRangeInputs('presetRange', 'startTime', 'endTime'));
+$('startTime').addEventListener('input', () => { $('presetRange').value = 'custom'; });
+$('endTime').addEventListener('input', () => { $('presetRange').value = 'custom'; });
+
+$('allOnBtn').addEventListener('click', () => { S.devices.forEach(d => S.selected.add(d.device_name)); renderDeviceList(); refreshChart(); });
+$('allOffBtn').addEventListener('click', () => { S.selected.clear(); renderDeviceList(); refreshChart(); });
+
+$('pauseBtn').addEventListener('click', () => {
+  S.paused = !S.paused;
+  const btn = $('pauseBtn'), lbl = $('statusLabel');
+  if (S.paused) {
+    btn.classList.add('paused'); btn.innerHTML = '&#9654; Resume';
+    lbl.className = 'status-label paused'; lbl.textContent = 'PAUSED';
+    if (S.refreshTimer) clearInterval(S.refreshTimer); S.refreshTimer = null;
+  } else {
+    btn.classList.remove('paused'); btn.innerHTML = '&#9646;&#9646; Pause';
+    lbl.className = 'status-label live'; lbl.textContent = 'LIVE';
+    startMainLoop();
+  }
+});
+
+$('cmdQueueToggle').addEventListener('click', () => {
+  S.cmdQueueOpen = !S.cmdQueueOpen;
+  $('cmdQueueBody').style.display = S.cmdQueueOpen ? 'block' : 'none';
+  $('cmdQueueArrow').innerHTML = S.cmdQueueOpen ? '&#9650; Hide' : '&#9660; Show';
+});
+
+let searchTO = null;
+$('searchInput').addEventListener('input', e => {
+  clearTimeout(searchTO);
+  searchTO = setTimeout(() => {
+    S.searchTerm = e.target.value.trim().toLowerCase();
+    S.highlightedDevice = null;
+    renderDeviceList(); renderInventoryCards(); refreshChart();
+  }, 200);
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (S.invFullscreen) closeInvFullscreen();
+    else if (S.fullscreen) closeFullscreen();
+    else closeModal();
+  }
+});
+
+/* ═══════════════════════  INIT  ═══════════════════════════════ */
+(async function init() {
+  syncRangeInputs('presetRange', 'startTime', 'endTime');
+  await Promise.all([fetchDevices(), fetchInventory(), fetchPending(), fetchAlerts()]);
+  updateHeaderStats();
+  await refreshChart();
+  startMainLoop();
+})();
+</script>
+</body>
+</html>

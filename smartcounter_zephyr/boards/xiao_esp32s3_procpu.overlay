@@ -1,0 +1,119 @@
+/*
+ * Smart Counter — devicetree overlay for the Seeed Studio XIAO ESP32-S3.
+ *
+ * This file replaces the hard-coded pin numbers and `Wire.begin()` /
+ * `Adafruit_SSD1306 display(...)` constructor calls in the Arduino
+ * sketch. Every peripheral the application uses is described here as
+ * a node; src/*.c only ever asks for the node by alias / chosen and
+ * never touches a raw pin number.
+ *
+ * Resulting macros (DT_ALIAS, DT_NODELABEL, DT_CHOSEN) are generated
+ * at build time and consumed in C via <zephyr/devicetree.h>.
+ */
+
+/ {
+	chosen {
+		/*
+		 * The OLED display device for cfb_framebuffer_*() helpers.
+		 * Replaces Adafruit_SSD1306's hard-coded I2C address arg.
+		 */
+		zephyr,display = &ssd1306_oled;
+	};
+
+	aliases {
+		btn-up    = &btn_up;
+		btn-down  = &btn_down;
+		btn-show  = &btn_show;
+		batt-en   = &batt_sense_en;
+		oled      = &ssd1306_oled;
+		die-temp  = &die_temp;
+	};
+
+	buttons {
+		compatible = "gpio-keys";
+
+		btn_up: button_up {
+			label = "Increment";
+			gpios = <&gpio0 1 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>; /* D0 */
+			zephyr,code = <INPUT_KEY_UP>;
+		};
+
+		btn_down: button_down {
+			label = "Decrement";
+			gpios = <&gpio0 2 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>; /* D1 */
+			zephyr,code = <INPUT_KEY_DOWN>;
+		};
+
+		btn_show: button_show {
+			label = "Show / Sync / Reset";
+			gpios = <&gpio0 3 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>; /* D2 */
+			zephyr,code = <INPUT_KEY_ENTER>;
+			/* deep-sleep wake source */
+			wakeup-source;
+		};
+	};
+
+	outputs {
+		compatible = "gpio-leds";
+
+		batt_sense_en: battery_sense_enable {
+			label = "BATT_SENSE_EN";
+			gpios = <&gpio0 18 GPIO_ACTIVE_HIGH>; /* D8 */
+		};
+	};
+
+	vbatt: vbatt {
+		/*
+		 * Standard Zephyr "voltage-divider" binding. Reads the ADC
+		 * channel underneath, scales by full-resistance / output-ohms,
+		 * and exposes the recovered battery voltage. Replaces the
+		 * manual BATTERY_DIVIDER_SCALE math in the sketch.
+		 */
+		compatible = "voltage-divider";
+		io-channels = <&adc0 9>;            /* A9 on XIAO */
+		output-ohms = <6800>;
+		full-ohms   = <(3300 + 6800)>;
+		power-gpios = <&gpio0 18 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+	};
+};
+
+&i2c0 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_FAST>;
+	pinctrl-0 = <&i2c0_default>;
+	pinctrl-names = "default";
+
+	ssd1306_oled: ssd1306@3c {
+		compatible = "solomon,ssd1306fb";
+		reg = <0x3c>;
+		width  = <128>;
+		height = <64>;
+		segment-offset  = <0>;
+		page-offset     = <0>;
+		display-offset  = <0>;
+		multiplex-ratio = <63>;
+		segment-remap;
+		com-invdir;
+		prechargep = <0x22>;
+	};
+};
+
+&adc0 {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel@9 {
+		reg = <9>;
+		zephyr,gain = "ADC_GAIN_1";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,resolution = <12>;
+	};
+};
+
+/* Internal die temperature sensor (ESP32-S3) */
+&die_temp {
+	status = "okay";
+};
