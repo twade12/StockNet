@@ -53,9 +53,9 @@ Flask REST API  ──────────────►  PostgreSQL
   <img src="SN_2.jpg" width="24%" />
 </p>
 
-<!-- <video src="StockNetDemo.mp4" controls width="100%">
+<video src="IMG_8192.mp4" controls width="100%">
   Your browser does not support the video tag.
-</video> -->
+</video>
 
 Each device is built on the **Seeed XIAO ESP32-S3**:
 
