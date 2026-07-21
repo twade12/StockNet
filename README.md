@@ -12,7 +12,7 @@
 
 Each **SmartCounter** device lives at a component bin and reports its live count over WiFi. The backend handles device self-registration, real-time inventory tracking, Bill-of-Materials deduction, tiered alerting (low-stock and low-battery), webhook fanout to Slack, production order planning, and cycle count scheduling — all on your own hardware with zero ongoing SaaS costs.
 
-[DEMO](https://stocknet.continuislabs.cloud/){:target="_blank"}
+<a href="https://stocknet.continuislabs.cloud/" target="_blank" rel="noopener noreferrer">DEMO</a>
 
 ## Architecture
 
