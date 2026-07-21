@@ -46,8 +46,19 @@ Flask REST API  ──────────────►  PostgreSQL
 
 ## Hardware — SmartCounter (ESP32-S3)
 
-<img src="StockNet_revA.png" alt="PCB_A" width="49%" />
-<img src="StockNet_revA2.png" alt="PCB_B" width="49%" />
+<img src="StockNet_revA.png" alt="PCB_A" width="25%" />
+<img src="StockNet_revA2.png" alt="PCB_B" width="25%" />
+
+<p align="center">
+  <img src="StockNet_revA.png" width="24%" />
+  <img src="StockNet_revA2.png" width="24%" />
+  <img src="SN_1.HEIC" width="24%" />
+  <img src="SN_2.HEIC" width="24%" />
+</p>
+
+<video src="StockNetDemo.MOV" controls width="100%">
+  Your browser does not support the video tag.
+</video>
 
 Each device is built on the **Seeed XIAO ESP32-S3**:
 
